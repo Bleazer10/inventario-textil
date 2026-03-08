@@ -1,0 +1,37 @@
+{% extends "base.html" %}
+
+{% block titulo %}Nuevo producto{% endblock %}
+
+{% block breadcrumbs %}
+<nav aria-label="breadcrumb">
+  <ol class="breadcrumb">
+    <li class="breadcrumb-item"><a href="{% url 'dashboard' %}"><i class="fa-solid fa-home"></i></a></li>
+    <li class="breadcrumb-item"><a href="{% url 'lista_productos' %}">Productos</a></li>
+    <li class="breadcrumb-item active">Nuevo producto</li>
+  </ol>
+</nav>
+{% endblock %}
+
+{% block content %}
+<div class="mb-3">
+  <h2 class="fw-black mb-0">Nuevo producto</h2>
+  <div class="text-white-50">Crea un producto base (las tallas/modelos van en variantes)</div>
+</div>
+
+<div class="row justify-content-center">
+  <div class="col-12 col-lg-7">
+    <div class="card card-bemore">
+      <div class="card-header text-center">Crear producto</div>
+      <div class="card-body">
+        <form method="post">
+          {% csrf_token %}
+          {{ form.as_p }}
+          <button class="btn btn-bemore w-100 fw-bold" type="submit">
+            <i class="fa-solid fa-floppy-disk me-2"></i> Guardar
+          </button>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

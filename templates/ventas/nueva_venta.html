@@ -1,0 +1,208 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block titulo %}Nueva venta{% endblock %}
+
+{% block breadcrumbs %}
+<nav aria-label="breadcrumb">
+  <ol class="breadcrumb">
+    <li class="breadcrumb-item"><a href="{% url 'dashboard' %}"><i class="fa-solid fa-home"></i></a></li>
+    <li class="breadcrumb-item active">Nueva venta</li>
+  </ol>
+</nav>
+{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <div>
+    <h2 class="fw-black mb-0">Nueva venta</h2>
+    <div class="text-white-50">Agrega productos y calcula el total automáticamente</div>
+  </div>
+</div>
+
+<div class="row g-3">
+  <div class="col-lg-5">
+    <div class="card card-bemore">
+      <div class="card-header">Datos de la venta</div>
+      <div class="card-body">
+        <form method="post" id="form-venta">
+          {% csrf_token %}
+
+          <div class="mb-3">
+            <label class="form-label">Fecha</label>
+            <input type="date" name="fecha" class="form-control" required>
+          </div>
+
+          <div class="mb-3">
+            <label class="form-label">Cliente (opcional)</label>
+            <select name="cliente" class="form-control">
+              <option value="">Cliente general</option>
+              {% for c in clientes %}
+                <option value="{{ c.id }}">{{ c.nombre }}</option>
+              {% endfor %}
+            </select>
+          </div>
+
+          <div class="mb-3">
+            <label class="form-label">Tipo de pago</label>
+            <select name="tipo_pago" class="form-control" id="tipo_pago">
+              <option value="CONTADO">Contado</option>
+              <option value="CREDITO">Crédito</option>
+            </select>
+          </div>
+
+          <hr class="border-light opacity-25">
+
+          <div class="mb-2 fw-bold">Agregar producto</div>
+
+          <div class="mb-2">
+            <label class="form-label">Producto</label>
+            <select class="form-control" id="variante_select">
+              <option value="">Selecciona...</option>
+              {% for v in variantes %}
+                <option value="{{ v.id }}" data-precio="{{ v.precio_venta_efectivo }}">
+                  {{ v.producto.nombre }} - {{ v.nombre }} (SKU: {{ v.sku }}) - ${{ v.precio_venta_efectivo }}
+                </option>
+              {% endfor %}
+            </select>
+          </div>
+
+          <div class="mb-3">
+            <label class="form-label">Cantidad</label>
+            <input type="number" min="1" step="1" class="form-control" id="cantidad_input" value="1">
+          </div>
+
+          <button type="button" class="btn btn-bemore w-100 fw-bold" id="btn_agregar">
+            <i class="fa-solid fa-plus me-2"></i> Agregar
+          </button>
+
+          <input type="hidden" name="items_json" id="items_json" value="[]">
+
+          <div class="mt-3 d-flex justify-content-between align-items-center">
+            <div class="text-white-50">Total</div>
+            <div class="fs-4 fw-black" id="total_text">$0.00</div>
+          </div>
+
+          <button type="submit" class="btn btn-outline-light w-100 mt-3 fw-bold">
+            <i class="fa-solid fa-floppy-disk me-2"></i> Guardar venta
+          </button>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-lg-7">
+    <div class="card card-bemore">
+      <div class="card-header">Detalle</div>
+      <div class="card-body">
+        <div class="table-responsive">
+          <table class="table table-bemore align-middle">
+            <thead>
+              <tr>
+                <th>Producto</th>
+                <th class="text-end">Precio</th>
+                <th class="text-end">Cant.</th>
+                <th class="text-end">Subtotal</th>
+                <th class="text-end"></th>
+              </tr>
+            </thead>
+            <tbody id="items_tbody">
+              <tr>
+                <td colspan="5" class="text-white-50">Agrega productos para ver el detalle.</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="text-white-50 mt-2">
+          Tip: puedes agregar varios productos antes de guardar.
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  const selectVariante = document.getElementById("variante_select");
+  const inputCantidad = document.getElementById("cantidad_input");
+  const btnAgregar = document.getElementById("btn_agregar");
+  const tbody = document.getElementById("items_tbody");
+  const totalText = document.getElementById("total_text");
+  const itemsJson = document.getElementById("items_json");
+
+  let items = [];
+
+  function money(n){
+    return "$" + Number(n).toFixed(2);
+  }
+
+  function render(){
+    if(items.length === 0){
+      tbody.innerHTML = `<tr><td colspan="5" class="text-white-50">Agrega productos para ver el detalle.</td></tr>`;
+      totalText.textContent = "$0.00";
+      itemsJson.value = "[]";
+      return;
+    }
+
+    let total = 0;
+    tbody.innerHTML = "";
+
+    items.forEach((it, idx) => {
+      const subtotal = it.precio * it.cantidad;
+      total += subtotal;
+
+      tbody.innerHTML += `
+        <tr>
+          <td>${it.nombre}</td>
+          <td class="text-end">${money(it.precio)}</td>
+          <td class="text-end">${it.cantidad}</td>
+          <td class="text-end">${money(subtotal)}</td>
+          <td class="text-end">
+            <button type="button" class="btn btn-sm btn-outline-light" onclick="removeItem(${idx})">
+              <i class="fa-solid fa-trash"></i>
+            </button>
+          </td>
+        </tr>
+      `;
+    });
+
+    totalText.textContent = money(total);
+    itemsJson.value = JSON.stringify(items.map(x => ({variante_id: x.variante_id, cantidad: x.cantidad})));
+  }
+
+  window.removeItem = function(idx){
+    items.splice(idx, 1);
+    render();
+  }
+
+  btnAgregar.addEventListener("click", () => {
+    const opt = selectVariante.options[selectVariante.selectedIndex];
+    const varianteId = selectVariante.value;
+    const precio = Number(opt?.dataset?.precio || 0);
+    const cantidad = Number(inputCantidad.value || 0);
+
+    if(!varianteId){
+      alert("Selecciona un producto.");
+      return;
+    }
+    if(cantidad <= 0){
+      alert("Cantidad inválida.");
+      return;
+    }
+
+    const nombre = opt.text;
+
+    items.push({
+      variante_id: Number(varianteId),
+      nombre,
+      precio,
+      cantidad
+    });
+
+    render();
+    selectVariante.value = "";
+    inputCantidad.value = 1;
+  });
+
+  render();
+</script>
+{% endblock %}

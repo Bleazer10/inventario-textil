@@ -1,0 +1,59 @@
+{% extends "base.html" %}
+
+{% block titulo %}{{ producto.nombre }}{% endblock %}
+
+{% block breadcrumbs %}
+<nav aria-label="breadcrumb">
+  <ol class="breadcrumb">
+    <li class="breadcrumb-item"><a href="{% url 'dashboard' %}"><i class="fa-solid fa-home"></i></a></li>
+    <li class="breadcrumb-item"><a href="{% url 'lista_productos' %}">Productos</a></li>
+    <li class="breadcrumb-item active">{{ producto.nombre }}</li>
+  </ol>
+</nav>
+{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <div>
+    <h2 class="fw-black mb-0">{{ producto.nombre }}</h2>
+    <div class="text-white-50">{{ producto.categoria.nombre }} • Precio defecto: ${{ producto.precio_venta_defecto }}</div>
+  </div>
+  <a class="btn btn-bemore fw-bold" href="{% url 'nueva_variante' producto.id %}">
+    <i class="fa-solid fa-plus me-2"></i> Nueva variante
+  </a>
+</div>
+
+<div class="card card-bemore">
+  <div class="card-header">Variantes</div>
+  <div class="card-body">
+    <div class="table-responsive">
+      <table class="table table-bemore align-middle">
+        <thead>
+          <tr>
+            <th>SKU</th>
+            <th>Variante</th>
+            <th class="text-end">Precio</th>
+            <th class="text-end">Modo costo</th>
+            <th class="text-end">Activa</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for v in variantes %}
+            <tr>
+              <td class="fw-bold">{{ v.sku }}</td>
+              <td>{{ v.nombre }}</td>
+              <td class="text-end">${{ v.precio_venta_efectivo }}</td>
+              <td class="text-end">{{ v.get_modo_costo_display }}</td>
+              <td class="text-end">{% if v.activa %}Sí{% else %}No{% endif %}</td>
+            </tr>
+          {% empty %}
+            <tr>
+              <td colspan="5" class="text-white-50">No hay variantes para este producto.</td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+{% endblock %}

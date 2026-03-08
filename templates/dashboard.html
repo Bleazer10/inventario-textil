@@ -1,0 +1,56 @@
+{% extends "base.html" %}
+
+{% block titulo %}Dashboard{% endblock %}
+
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <div>
+    <h2 class="fw-black mb-0">Dashboard</h2>
+    <div class="text-white-50">Resumen rápido del negocio</div>
+  </div>
+
+  <div class="d-flex gap-2">
+    <a href="{% url 'nueva_venta' %}" class="btn btn-bemore fw-bold">
+      <i class="fa-solid fa-plus me-2"></i> Nueva venta
+    </a>
+    <a href="{% url 'nuevo_gasto' %}" class="btn btn-outline-light fw-bold">
+      <i class="fa-solid fa-receipt me-2"></i> Nuevo gasto
+    </a>
+  </div>
+</div>
+
+<div class="row g-3">
+  <div class="col-md-3">
+    <div class="card card-bemore p-3">
+      <div class="text-white-50">Ventas (hoy)</div>
+      <div class="fs-3 fw-black">$0.00</div>
+    </div>
+  </div>
+  <div class="col-md-3">
+    <div class="card card-bemore p-3">
+      <div class="text-white-50">Gastos (hoy)</div>
+      <div class="fs-3 fw-black">$0.00</div>
+    </div>
+  </div>
+  <div class="col-md-3">
+    <div class="card card-bemore p-3">
+      <div class="text-white-50">Por cobrar</div>
+      <div class="fs-3 fw-black">$0.00</div>
+    </div>
+  </div>
+  <div class="col-md-3">
+    <div class="card card-bemore p-3">
+      <div class="text-white-50">Por pagar</div>
+      <div class="fs-3 fw-black">$0.00</div>
+    </div>
+  </div>
+</div>
+
+<div class="card card-bemore mt-4">
+  <div class="card-header">Movimientos recientes</div>
+  <div class="card-body">
+    <div class="text-white-50">Aquí verás las últimas ventas, gastos y pagos.</div>
+  </div>
+</div>
+{% endblock %}

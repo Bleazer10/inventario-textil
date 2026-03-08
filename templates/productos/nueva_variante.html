@@ -1,0 +1,38 @@
+{% extends "base.html" %}
+
+{% block titulo %}Nueva variante{% endblock %}
+
+{% block breadcrumbs %}
+<nav aria-label="breadcrumb">
+  <ol class="breadcrumb">
+    <li class="breadcrumb-item"><a href="{% url 'dashboard' %}"><i class="fa-solid fa-home"></i></a></li>
+    <li class="breadcrumb-item"><a href="{% url 'lista_productos' %}">Productos</a></li>
+    <li class="breadcrumb-item"><a href="{% url 'detalle_producto' producto.id %}">{{ producto.nombre }}</a></li>
+    <li class="breadcrumb-item active">Nueva variante</li>
+  </ol>
+</nav>
+{% endblock %}
+
+{% block content %}
+<div class="mb-3">
+  <h2 class="fw-black mb-0">Nueva variante</h2>
+  <div class="text-white-50">Producto: {{ producto.nombre }}</div>
+</div>
+
+<div class="row justify-content-center">
+  <div class="col-12 col-lg-7">
+    <div class="card card-bemore">
+      <div class="card-header text-center">Crear variante</div>
+      <div class="card-body">
+        <form method="post">
+          {% csrf_token %}
+          {{ form.as_p }}
+          <button class="btn btn-bemore w-100 fw-bold" type="submit">
+            <i class="fa-solid fa-floppy-disk me-2"></i> Guardar variante
+          </button>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

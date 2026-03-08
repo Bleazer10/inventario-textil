@@ -1,0 +1,225 @@
+:root{
+  --bemore-black: #0b0b0b;
+  --bemore-black-2: #111111;
+  --bemore-white: #ffffff;
+  --bemore-orange: #ff4d00;   /* puedes ajustar si el logo tiene otro naranja */
+  --bemore-orange-2: #ff7a2f;
+
+  --border: rgba(255,255,255,.12);
+}
+
+html, body{
+  height: 100%;
+}
+
+body{
+  font-family: "Roboto", sans-serif;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Main toma el espacio restante */
+main {
+  flex: 1;
+}
+
+/* Fondo general (oscuro moderno) */
+.bg-bemore{
+  background:
+    radial-gradient(circle at 15% 10%, rgba(255, 77, 0, 0.18), transparent 55%),
+    radial-gradient(circle at 90% 20%, rgba(255, 122, 47, 0.14), transparent 55%),
+    linear-gradient(180deg, #0b0b0b 0%, #0b0b0b 100%);
+  background-attachment: fixed;   /* ✅ clave */
+  background-repeat: no-repeat;
+  background-size: cover;         /* ✅ clave */
+  color: var(--bemore-white);
+  min-height: 100vh;              /* ✅ clave */
+}
+
+/* Navbar */
+.bg-bemore-nav{
+  background: linear-gradient(90deg, var(--bemore-black), var(--bemore-black-2));
+  border-bottom: 1px solid var(--border);
+}
+
+.fw-black{
+  font-weight: 900;
+}
+
+/* Footer */
+.footer-bemore{
+  background: linear-gradient(90deg, var(--bemore-black), var(--bemore-black-2));
+  border-top: 1px solid var(--border);
+}
+
+/* Botones */
+.btn-bemore{
+  background: var(--bemore-orange);
+  color: white;
+  border: none;
+}
+.btn-bemore:hover{
+  background: var(--bemore-orange-2);
+  color: white;
+}
+
+/* Cards */
+.card-bemore{
+  background: rgba(17,17,17,.75);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  color: white;
+  box-shadow: 0 8px 24px rgba(0,0,0,.25);
+}
+
+.card-bemore .card-header{
+  background: linear-gradient(90deg, rgba(255,77,0,.95), rgba(255,122,47,.85));
+  color: #0b0b0b;
+  border-bottom: 1px solid rgba(255,255,255,.10);
+  font-weight: 800;
+
+  /* compacto */
+  padding: .65rem 1rem;
+  font-size: 1rem;
+  border-radius: 14px;
+}
+
+/* ── Tablas – fix Bootstrap 5 completo ── */
+.table-bemore,
+.table-bemore > :not(caption) > * > * {
+  background-color: transparent !important;
+  color: white !important;
+  --bs-table-bg: transparent;
+  --bs-table-color: white;
+  --bs-table-border-color: rgba(255,255,255,.10);
+}
+
+.table-bemore thead > tr > th {
+  background-color: transparent !important;
+  color: var(--bemore-orange) !important;
+  font-weight: 700 !important;
+  border-bottom: 2px solid var(--bemore-orange) !important;
+  border-top: none !important;
+  box-shadow: none !important;
+  text-transform: uppercase;
+  font-size: .75rem;
+  letter-spacing: .08em;
+}
+
+.table-bemore tbody > tr:hover > td {
+  background-color: rgba(255,255,255,.10) !important;
+}
+
+/* Dropdown menú dark mejorado */
+.dropdown-menu-dark{
+  background: rgba(15,15,15,.96);
+  border: 1px solid var(--border);
+}
+
+/* Paginación (por si la usas) */
+.pagination .page-link{
+  color: rgba(255,255,255,.85);
+  background: rgba(17,17,17,.75);
+  border-color: rgba(255,255,255,.12);
+}
+.pagination .page-item.active .page-link{
+  background: var(--bemore-orange);
+  border-color: var(--bemore-orange);
+  color: #0b0b0b;
+  font-weight: 800;
+}
+
+/* Inputs blancos (como los quieres) */
+.form-control{
+  background: #ffffff;
+  border: 1px solid rgba(0,0,0,.12);
+  color: #111;
+}
+
+/* ── Ajustes específicos para el buscador ── */
+/* reduce el relleno de la tarjeta y de los campos para que el bloque de "Buscar" no ocupe tanto alto */
+.card-bemore.search-compact .card-body {
+  padding: .65rem 1rem;
+}
+.card-bemore.search-compact .form-control {
+  padding: .375rem .75rem;
+  font-size: .9rem;
+}.card-bemore.search-compact .btn {
+  padding: .375rem .75rem;
+  font-size: .9rem;
+}
+/* ── Tablas más claras ── */
+/* aplico un fondo ligero solo a las celdas de datos para que se contraste mejor con el fondo oscuro */
+/* el thead mantiene el fondo transparente para que se vea oscuro como antes */
+.table-bemore tbody > tr > td {
+  background-color: rgba(255,255,255,.04) !important;
+}
+.table-bemore thead > tr > th {
+  background-color: transparent !important;
+  color: var(--bemore-white) !important;
+}
+
+.form-control:focus{
+  background: #e9edf2;
+  border-color: rgba(255,77,0,.75);
+  box-shadow: 0 0 0 .25rem rgba(255,77,0,.18);
+  color: #111;
+}
+
+.form-label{
+  color: rgba(255,255,255,.90);
+}
+
+/* Placeholder (gris suave) */
+.form-control::placeholder{
+  color: rgba(0,0,0,.45);
+}
+
+/* Autofill (Chrome) - mantenerlo blanco */
+input:-webkit-autofill,
+input:-webkit-autofill:hover,
+input:-webkit-autofill:focus{
+  -webkit-text-fill-color: #111;
+  -webkit-box-shadow: 0 0 0px 1000px #e9edf2 inset;
+  transition: background-color 9999s ease-in-out 0s;
+}
+
+.btn-bemore:focus,
+.btn-bemore:focus-visible{
+  outline: none;
+  box-shadow: 0 0 0 .25rem rgba(255,77,0,.25);
+}
+
+.dropdown-menu-dark .dropdown-item{
+  color: rgba(255,255,255,.85);
+}
+.dropdown-menu-dark .dropdown-item:hover{
+  background: rgba(248, 246, 246, 0.06);
+  color: #fff;
+}
+
+/* ── Breadcrumbs ── */
+.breadcrumb {
+  background: transparent;
+  border-radius: 0;
+  padding: 0;
+  margin-bottom: 1rem;
+}
+.breadcrumb-item + .breadcrumb-item::before {
+  content: "/";
+  color: rgba(255,255,255,.5);
+}
+.breadcrumb-item a {
+  color: var(--bemore-orange);
+  text-decoration: none;
+}
+.breadcrumb-item a:hover {
+  color: var(--bemore-orange-2);
+  text-decoration: underline;
+}
+.breadcrumb-item.active {
+  color: var(--bemore-white);
+}
+.breadcrumb-item.active i {
+  color: var(--bemore-white);
+}
