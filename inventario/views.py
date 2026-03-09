@@ -1,6 +1,6 @@
 import json
 from decimal import Decimal
-from datetime import date
+from datetime import date, timedelta, datetime
 
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
@@ -8,7 +8,10 @@ from django.shortcuts import render, redirect, get_object_or_404
 
 from django.db.models import Q
 from .forms import ProductoForm, VarianteProductoForm, CategoriaProductoForm
-from .models import Producto, VarianteProducto, CategoriaProducto
+from .models import Producto, VarianteProducto, CategoriaProducto, Venta, Gasto, CuentaPorCobrar, CuentaPorPagarCompra, CuentaPorPagarGasto
+
+from django.db.models import Sum
+
 
 from .models import (
     Cliente,
@@ -272,3 +275,82 @@ def nuevo_gasto(request):
 
     return render(request, "gastos/nuevo_gasto.html", {"categorias": categorias})
 
+@login_required
+def movimientos(request):
+    filtro = request.GET.get("filtro", "hoy")  # hoy | semana | mes | rango
+    hoy = date.today()
+
+    # Determinar rango de fechas
+    if filtro == "hoy":
+        fecha_inicio = hoy
+        fecha_fin = hoy
+    elif filtro == "semana":
+        # lunes a domingo
+        fecha_inicio = hoy - timedelta(days=hoy.weekday())
+        fecha_fin = fecha_inicio + timedelta(days=6)
+    elif filtro == "mes":
+        fecha_inicio = hoy.replace(day=1)
+        # fin de mes
+        if fecha_inicio.month == 12:
+            fecha_fin = fecha_inicio.replace(year=fecha_inicio.year + 1, month=1, day=1) - timedelta(days=1)
+        else:
+            fecha_fin = fecha_inicio.replace(month=fecha_inicio.month + 1, day=1) - timedelta(days=1)
+    else:
+        # rango personalizado
+        fi = request.GET.get("fi")
+        ff = request.GET.get("ff")
+        try:
+            fecha_inicio = datetime.strptime(fi, "%Y-%m-%d").date() if fi else hoy
+            fecha_fin = datetime.strptime(ff, "%Y-%m-%d").date() if ff else hoy
+        except:
+            fecha_inicio = hoy
+            fecha_fin = hoy
+
+    # Ventas confirmadas en rango
+    ventas_qs = Venta.objects.filter(
+        fecha__gte=fecha_inicio,
+        fecha__lte=fecha_fin,
+        estado=Venta.Estado.CONFIRMADA,
+    )
+    ventas_total = ventas_qs.aggregate(s=Sum("total"))["s"] or Decimal("0.00")
+
+    # Gastos en rango (todos)
+    gastos_qs = Gasto.objects.filter(
+        fecha__gte=fecha_inicio,
+        fecha__lte=fecha_fin,
+    )
+    gastos_total = gastos_qs.aggregate(s=Sum("monto"))["s"] or Decimal("0.00")
+
+    balance = (ventas_total - gastos_total).quantize(Decimal("0.01"))
+
+    # Por cobrar / Por pagar (saldo)
+    por_cobrar_total = (CuentaPorCobrar.objects.filter(estado=CuentaPorCobrar.Estado.ABIERTA)
+                        .aggregate(s=Sum("saldo"))["s"] or Decimal("0.00"))
+
+    por_pagar_compras_total = (CuentaPorPagarCompra.objects.filter(estado=CuentaPorPagarCompra.Estado.ABIERTA)
+                              .aggregate(s=Sum("saldo"))["s"] or Decimal("0.00"))
+
+    por_pagar_gastos_total = (CuentaPorPagarGasto.objects.filter(estado=CuentaPorPagarGasto.Estado.ABIERTA)
+                             .aggregate(s=Sum("saldo"))["s"] or Decimal("0.00"))
+
+    por_pagar_total = (por_pagar_compras_total + por_pagar_gastos_total).quantize(Decimal("0.01"))
+
+    # Listas para pestañas (últimos registros del rango)
+    ventas_lista = ventas_qs.order_by("-fecha", "-id")[:20]
+    gastos_lista = gastos_qs.order_by("-fecha", "-id")[:20]
+
+    return render(request, "movimientos/movimientos.html", {
+        "filtro": filtro,
+        "fecha_inicio": fecha_inicio,
+        "fecha_fin": fecha_fin,
+
+        "ventas_total": ventas_total,
+        "gastos_total": gastos_total,
+        "balance": balance,
+
+        "por_cobrar_total": por_cobrar_total,
+        "por_pagar_total": por_pagar_total,
+
+        "ventas_lista": ventas_lista,
+        "gastos_lista": gastos_lista,
+    })

@@ -1,0 +1,158 @@
+{% extends "base.html" %}
+
+{% block titulo %}Movimientos{% endblock %}
+
+{% block breadcrumbs %}
+<nav aria-label="breadcrumb">
+  <ol class="breadcrumb">
+    <li class="breadcrumb-item"><a href="{% url 'dashboard' %}"><i class="fa-solid fa-home"></i></a></li>
+    <li class="breadcrumb-item active">Movimientos</li>
+  </ol>
+</nav>
+{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <div>
+    <h2 class="fw-black mb-0">Movimientos</h2>
+    <div class="text-white-50">
+      Balance y registros • {{ fecha_inicio }} → {{ fecha_fin }}
+    </div>
+  </div>
+</div>
+
+<div class="card card-bemore mb-3">
+  <div class="card-body">
+    <div class="d-flex flex-wrap gap-2 align-items-center">
+      <a class="btn {% if filtro == 'hoy' %}btn-bemore{% else %}btn-outline-light{% endif %} fw-bold" href="?filtro=hoy">Hoy</a>
+      <a class="btn {% if filtro == 'semana' %}btn-bemore{% else %}btn-outline-light{% endif %} fw-bold" href="?filtro=semana">Semana</a>
+      <a class="btn {% if filtro == 'mes' %}btn-bemore{% else %}btn-outline-light{% endif %} fw-bold" href="?filtro=mes">Mes</a>
+
+      <form class="d-flex gap-2 ms-auto" method="get">
+        <input type="hidden" name="filtro" value="rango">
+        <input type="date" name="fi" class="form-control" value="{{ fecha_inicio|date:'Y-m-d' }}">
+        <input type="date" name="ff" class="form-control" value="{{ fecha_fin|date:'Y-m-d' }}">
+        <button class="btn btn-outline-light fw-bold" type="submit">
+          <i class="fa-solid fa-filter me-2"></i> Filtrar
+        </button>
+      </form>
+    </div>
+  </div>
+</div>
+
+<div class="row g-3">
+  <div class="col-md-3">
+    <div class="card card-bemore p-3">
+      <div class="text-white-50">Balance</div>
+      <div class="fs-3 fw-black">${{ balance }}</div>
+    </div>
+  </div>
+  <div class="col-md-3">
+    <div class="card card-bemore p-3">
+      <div class="text-white-50">Ventas totales</div>
+      <div class="fs-3 fw-black">${{ ventas_total }}</div>
+    </div>
+  </div>
+  <div class="col-md-3">
+    <div class="card card-bemore p-3">
+      <div class="text-white-50">Gastos totales</div>
+      <div class="fs-3 fw-black">${{ gastos_total }}</div>
+    </div>
+  </div>
+  <div class="col-md-3">
+    <div class="card card-bemore p-3">
+      <div class="text-white-50">Por cobrar</div>
+      <div class="fs-3 fw-black">${{ por_cobrar_total }}</div>
+    </div>
+  </div>
+</div>
+
+<div class="row g-3 mt-1">
+  <div class="col-md-3">
+    <div class="card card-bemore p-3">
+      <div class="text-white-50">Por pagar</div>
+      <div class="fs-3 fw-black">${{ por_pagar_total }}</div>
+    </div>
+  </div>
+</div>
+
+<div class="card card-bemore mt-4">
+  <div class="card-header">Registros</div>
+  <div class="card-body">
+
+    <ul class="nav nav-tabs mb-3" role="tablist">
+      <li class="nav-item" role="presentation">
+        <button class="nav-link active" data-bs-toggle="tab" data-bs-target="#ingresos" type="button">
+          Ingresos (Ventas)
+        </button>
+      </li>
+      <li class="nav-item" role="presentation">
+        <button class="nav-link" data-bs-toggle="tab" data-bs-target="#egresos" type="button">
+          Egresos (Gastos)
+        </button>
+      </li>
+    </ul>
+
+    <div class="tab-content">
+      <div class="tab-pane fade show active" id="ingresos">
+        <div class="table-responsive">
+          <table class="table table-bemore align-middle">
+            <thead>
+              <tr>
+                <th>ID</th>
+                <th>Fecha</th>
+                <th>Cliente</th>
+                <th class="text-end">Total</th>
+                <th class="text-end">Tipo</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for v in ventas_lista %}
+                <tr>
+                  <td class="fw-bold">#{{ v.id }}</td>
+                  <td>{{ v.fecha }}</td>
+                  <td class="text-white-50">{{ v.cliente.nombre|default:"General" }}</td>
+                  <td class="text-end">${{ v.total }}</td>
+                  <td class="text-end">{{ v.get_tipo_pago_display }}</td>
+                </tr>
+              {% empty %}
+                <tr><td colspan="5" class="text-white-50">No hay ventas en este rango.</td></tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="tab-pane fade" id="egresos">
+        <div class="table-responsive">
+          <table class="table table-bemore align-middle">
+            <thead>
+              <tr>
+                <th>ID</th>
+                <th>Fecha</th>
+                <th>Categoría</th>
+                <th class="text-end">Monto</th>
+                <th class="text-end">Estado</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for g in gastos_lista %}
+                <tr>
+                  <td class="fw-bold">#{{ g.id }}</td>
+                  <td>{{ g.fecha }}</td>
+                  <td class="text-white-50">{{ g.categoria.nombre }}</td>
+                  <td class="text-end">${{ g.monto }}</td>
+                  <td class="text-end">{{ g.get_estado_pago_display }}</td>
+                </tr>
+              {% empty %}
+                <tr><td colspan="5" class="text-white-50">No hay gastos en este rango.</td></tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+{% endblock %}
