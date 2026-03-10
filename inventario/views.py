@@ -7,8 +7,8 @@ from django.contrib.auth.decorators import login_required
 from django.shortcuts import render, redirect, get_object_or_404
 
 from django.db.models import Q
-from .forms import ProductoForm, VarianteProductoForm, CategoriaProductoForm
-from .models import Producto, VarianteProducto, CategoriaProducto, Venta, Gasto, CuentaPorCobrar, CuentaPorPagarCompra, CuentaPorPagarGasto
+from .forms import ProductoForm, VarianteProductoForm, CategoriaProductoForm, CategoriaMaterialForm, MaterialForm, AlmacenForm
+from .models import Producto, VarianteProducto, CategoriaProducto, Venta, Gasto, CuentaPorCobrar, CuentaPorPagarCompra, CuentaPorPagarGasto, MovimientoInventario, Almacen, CategoriaMaterial, Material, Almacen
 
 from django.db.models import Sum
 
@@ -354,3 +354,206 @@ def movimientos(request):
         "ventas_lista": ventas_lista,
         "gastos_lista": gastos_lista,
     })
+
+@login_required
+def movimientos_inventario(request):
+    tipo = request.GET.get("tipo", "").strip()        # ENTRADA / SALIDA / AJUSTE / TRASLADO
+    almacen_id = request.GET.get("almacen", "").strip()
+    q = request.GET.get("q", "").strip()
+
+    fi = request.GET.get("fi", "")
+    ff = request.GET.get("ff", "")
+
+    # Rango por defecto: últimos 30 días
+    hoy = datetime.now().date()
+    if not fi:
+        fi_date = hoy - timedelta(days=30)
+    else:
+        try:
+            fi_date = datetime.strptime(fi, "%Y-%m-%d").date()
+        except:
+            fi_date = hoy - timedelta(days=30)
+
+    if not ff:
+        ff_date = hoy
+    else:
+        try:
+            ff_date = datetime.strptime(ff, "%Y-%m-%d").date()
+        except:
+            ff_date = hoy
+
+    movimientos = (
+        MovimientoInventario.objects
+        .select_related(
+            "item",
+            "item__almacen",
+            "item__material",
+            "item__variante_producto",
+            "item__variante_producto__producto",
+        )
+        .filter(creado__date__gte=fi_date, creado__date__lte=ff_date)
+        .order_by("-creado")
+    )
+
+    if tipo:
+        movimientos = movimientos.filter(tipo=tipo)
+
+    if almacen_id:
+        movimientos = movimientos.filter(item__almacen_id=almacen_id)
+
+    if q:
+        movimientos = movimientos.filter(
+            Q(item__material__nombre__icontains=q) |
+            Q(item__variante_producto__sku__icontains=q) |
+            Q(item__variante_producto__producto__nombre__icontains=q) |
+            Q(item__variante_producto__nombre__icontains=q) |
+            Q(referencia__icontains=q)
+        )
+
+    almacenes = Almacen.objects.filter(activo=True).order_by("nombre")
+
+    return render(request, "inventario/movimientos_inventario.html", {
+        "movimientos": movimientos[:300],  # límite visual para no cargar demasiado
+        "almacenes": almacenes,
+
+        "tipo": tipo,
+        "almacen_id": almacen_id,
+        "q": q,
+        "fi": fi_date.strftime("%Y-%m-%d"),
+        "ff": ff_date.strftime("%Y-%m-%d"),
+    })
+
+@login_required
+def lista_categorias_material(request):
+    q = request.GET.get("q", "").strip()
+    categorias = CategoriaMaterial.objects.all().order_by("nombre")
+    if q:
+        categorias = categorias.filter(nombre__icontains=q)
+
+    return render(request, "materiales/categorias_lista.html", {
+        "categorias": categorias,
+        "q": q,
+    })
+
+
+@login_required
+def nueva_categoria_material(request):
+    if request.method == "POST":
+        form = CategoriaMaterialForm(request.POST)
+        if form.is_valid():
+            form.save()
+            messages.success(request, "Categoría de material creada correctamente.")
+            return redirect("lista_categorias_material")
+        messages.error(request, "Revisa los datos del formulario.")
+    else:
+        form = CategoriaMaterialForm()
+
+    return render(request, "materiales/categorias_form.html", {"form": form, "modo": "nueva"})
+
+
+@login_required
+def editar_categoria_material(request, categoria_id):
+    categoria = get_object_or_404(CategoriaMaterial, id=categoria_id)
+
+    if request.method == "POST":
+        form = CategoriaMaterialForm(request.POST, instance=categoria)
+        if form.is_valid():
+            form.save()
+            messages.success(request, "Categoría de material actualizada correctamente.")
+            return redirect("lista_categorias_material")
+        messages.error(request, "Revisa los datos del formulario.")
+    else:
+        form = CategoriaMaterialForm(instance=categoria)
+
+    return render(request, "materiales/categorias_form.html", {
+        "form": form,
+        "modo": "editar",
+        "categoria": categoria,
+    })
+
+@login_required
+def lista_materiales(request):
+    q = request.GET.get("q", "").strip()
+    materiales = Material.objects.select_related("categoria").order_by("nombre")
+
+    if q:
+        materiales = materiales.filter(
+            Q(nombre__icontains=q) |
+            Q(categoria__nombre__icontains=q) |
+            Q(unidad__icontains=q)
+        )
+
+    return render(request, "materiales/materiales_lista.html", {"materiales": materiales, "q": q})
+
+
+@login_required
+def nuevo_material(request):
+    if request.method == "POST":
+        form = MaterialForm(request.POST)
+        if form.is_valid():
+            form.save()
+            messages.success(request, "Material creado correctamente.")
+            return redirect("lista_materiales")
+        messages.error(request, "Revisa los datos del formulario.")
+    else:
+        form = MaterialForm()
+
+    return render(request, "materiales/materiales_form.html", {"form": form, "modo": "nueva"})
+
+
+@login_required
+def editar_material(request, material_id):
+    material = get_object_or_404(Material, id=material_id)
+
+    if request.method == "POST":
+        form = MaterialForm(request.POST, instance=material)
+        if form.is_valid():
+            form.save()
+            messages.success(request, "Material actualizado correctamente.")
+            return redirect("lista_materiales")
+        messages.error(request, "Revisa los datos del formulario.")
+    else:
+        form = MaterialForm(instance=material)
+
+    return render(request, "materiales/materiales_form.html", {"form": form, "modo": "editar", "material": material})
+
+@login_required
+def lista_almacenes(request):
+    q = request.GET.get("q", "").strip()
+    almacenes = Almacen.objects.all().order_by("nombre")
+    if q:
+        almacenes = almacenes.filter(nombre__icontains=q)
+
+    return render(request, "almacenes/lista.html", {"almacenes": almacenes, "q": q})
+
+
+@login_required
+def nuevo_almacen(request):
+    if request.method == "POST":
+        form = AlmacenForm(request.POST)
+        if form.is_valid():
+            form.save()
+            messages.success(request, "Almacén creado correctamente.")
+            return redirect("lista_almacenes")
+        messages.error(request, "Revisa los datos del formulario.")
+    else:
+        form = AlmacenForm()
+
+    return render(request, "almacenes/form.html", {"form": form, "modo": "nueva"})
+
+
+@login_required
+def editar_almacen(request, almacen_id):
+    almacen = get_object_or_404(Almacen, id=almacen_id)
+
+    if request.method == "POST":
+        form = AlmacenForm(request.POST, instance=almacen)
+        if form.is_valid():
+            form.save()
+            messages.success(request, "Almacén actualizado correctamente.")
+            return redirect("lista_almacenes")
+        messages.error(request, "Revisa los datos del formulario.")
+    else:
+        form = AlmacenForm(instance=almacen)
+
+    return render(request, "almacenes/form.html", {"form": form, "modo": "editar", "almacen": almacen})

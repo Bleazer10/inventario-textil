@@ -1,0 +1,128 @@
+{% extends "base.html" %}
+
+{% block titulo %}Movimientos de inventario{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <div>
+    <h2 class="fw-black mb-0">Movimientos de inventario</h2>
+    <div class="text-white-50">Entradas, salidas, ajustes y traslados</div>
+  </div>
+</div>
+
+<div class="card card-bemore mb-3">
+  <div class="card-header">Filtros</div>
+  <div class="card-body">
+    <form method="get" class="row g-2 align-items-end">
+      <div class="col-12 col-md-3">
+        <label class="form-label">Tipo</label>
+        <select name="tipo" class="form-control">
+          <option value="">Todos</option>
+          <option value="ENTRADA" {% if tipo == "ENTRADA" %}selected{% endif %}>Entrada</option>
+          <option value="SALIDA" {% if tipo == "SALIDA" %}selected{% endif %}>Salida</option>
+          <option value="AJUSTE" {% if tipo == "AJUSTE" %}selected{% endif %}>Ajuste</option>
+          <option value="TRASLADO" {% if tipo == "TRASLADO" %}selected{% endif %}>Traslado</option>
+        </select>
+      </div>
+
+      <div class="col-12 col-md-3">
+        <label class="form-label">Almacén</label>
+        <select name="almacen" class="form-control">
+          <option value="">Todos</option>
+          {% for a in almacenes %}
+            <option value="{{ a.id }}" {% if almacen_id|stringformat:"s" == a.id|stringformat:"s" %}selected{% endif %}>
+              {{ a.nombre }}
+            </option>
+          {% endfor %}
+        </select>
+      </div>
+
+      <div class="col-6 col-md-2">
+        <label class="form-label">Desde</label>
+        <input type="date" name="fi" class="form-control" value="{{ fi }}">
+      </div>
+
+      <div class="col-6 col-md-2">
+        <label class="form-label">Hasta</label>
+        <input type="date" name="ff" class="form-control" value="{{ ff }}">
+      </div>
+
+      <div class="col-12 col-md-2">
+        <label class="form-label">Buscar</label>
+        <input type="text" name="q" class="form-control" value="{{ q }}" placeholder="SKU, material...">
+      </div>
+
+      <div class="col-12 d-flex gap-2 mt-2">
+        <button class="btn btn-bemore fw-bold" type="submit">
+          <i class="fa-solid fa-filter me-2"></i> Aplicar
+        </button>
+        <a class="btn btn-outline-light fw-bold" href="{% url 'movimientos_inventario' %}">
+          Limpiar
+        </a>
+      </div>
+    </form>
+  </div>
+</div>
+
+<div class="card card-bemore">
+  <div class="card-header">Listado</div>
+  <div class="card-body">
+    <div class="table-responsive">
+      <table class="table table-bemore align-middle">
+        <thead>
+          <tr>
+            <th>Fecha/Hora</th>
+            <th>Tipo</th>
+            <th>Almacén</th>
+            <th>Ítem</th>
+            <th class="text-end">Cantidad</th>
+            <th class="text-end">Costo unit.</th>
+            <th>Referencia</th>
+            <th>Nota</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for m in movimientos %}
+            <tr>
+              <td class="text-white-50">{{ m.creado|date:"Y-m-d H:i" }}</td>
+              <td class="fw-bold">{{ m.get_tipo_display }}</td>
+              <td class="text-white-50">{{ m.item.almacen.nombre }}</td>
+
+              <td>
+                {% if m.item.tipo == "MATERIAL" and m.item.material %}
+                  <span class="badge text-bg-secondary">Material</span>
+                  {{ m.item.material.nombre }}
+                {% elif m.item.tipo == "PRODUCTO" and m.item.variante_producto %}
+                  <span class="badge text-bg-info">Producto</span>
+                  {{ m.item.variante_producto.producto.nombre }} - {{ m.item.variante_producto.nombre }}
+                  <div class="text-white-50 small">SKU: {{ m.item.variante_producto.sku }}</div>
+                {% else %}
+                  <span class="text-white-50">Ítem no definido</span>
+                {% endif %}
+              </td>
+
+              <td class="text-end fw-bold">{{ m.cantidad }}</td>
+              <td class="text-end">
+                {% if m.costo_unitario %}${{ m.costo_unitario }}{% else %}<span class="text-white-50">-</span>{% endif %}
+              </td>
+              <td class="text-white-50">
+                {% if m.referencia %}{{ m.referencia }}{% endif %}
+                {% if m.referencia_id %} #{{ m.referencia_id }}{% endif %}
+              </td>
+              <td class="text-white-50">{{ m.nota|default:"" }}</td>
+            </tr>
+          {% empty %}
+            <tr>
+              <td colspan="8" class="text-white-50">No hay movimientos en este rango.</td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+
+    <div class="text-white-50 small mt-2">
+      Mostrando hasta 300 movimientos (luego añadimos paginación).
+    </div>
+  </div>
+</div>
+{% endblock %}

@@ -76,8 +76,16 @@
               <li><a class="dropdown-item" href="{% url 'lista_productos' %}">
                     <i class="fa-solid fa-shirt me-1"></i> Productos
                   </a></li>
-              <li><a class="dropdown-item" href="#"><i class="fa-solid fa-layer-group me-1"></i> Materiales</a></li>
-              <li><a class="dropdown-item" href="#"><i class="fa-solid fa-warehouse me-1"></i> Almacenes</a></li>
+              <li><a class="dropdown-item" href="{% url 'movimientos_inventario' %}">
+                    <i class="fa-solid fa-right-left me-1"></i> Movimientos de inventario
+                  </a></li>
+              <li><a class="dropdown-item" href="{% url 'lista_materiales' %}">
+                <i class="fa-solid fa-layer-group me-1"></i> Materiales
+              </a></li>
+
+              <li><a class="dropdown-item" href="{% url 'lista_almacenes' %}">
+                <i class="fa-solid fa-warehouse me-1"></i> Almacenes
+              </a></li>
             </ul>
           </li>
 

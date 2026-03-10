@@ -1,0 +1,68 @@
+{% extends "base.html" %}
+
+{% block titulo %}Materiales{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <div>
+    <h2 class="fw-black mb-0">Materiales</h2>
+    <div class="text-white-50">Insumos para producción (tela, hilo, vinil...)</div>
+  </div>
+
+  <div class="d-flex gap-2">
+    <a class="btn btn-outline-light fw-bold" href="{% url 'lista_categorias_material' %}">
+      <i class="fa-solid fa-tags me-2"></i> Categorías
+    </a>
+    <a class="btn btn-bemore fw-bold" href="{% url 'nuevo_material' %}">
+      <i class="fa-solid fa-plus me-2"></i> Nuevo material
+    </a>
+  </div>
+</div>
+
+<div class="card card-bemore mb-3">
+  <div class="card-body">
+    <form method="get" class="d-flex gap-2">
+      <input class="form-control" name="q" value="{{ q }}" placeholder="Buscar por nombre, categoría, unidad...">
+      <button class="btn btn-outline-light fw-bold" type="submit">
+        <i class="fa-solid fa-magnifying-glass me-2"></i> Buscar
+      </button>
+    </form>
+  </div>
+</div>
+
+<div class="card card-bemore">
+  <div class="card-header">Listado</div>
+  <div class="card-body">
+    <div class="table-responsive">
+      <table class="table table-bemore align-middle">
+        <thead>
+          <tr>
+            <th>Material</th>
+            <th>Categoría</th>
+            <th>Unidad</th>
+            <th class="text-end">Costo defecto</th>
+            <th class="text-end">Activo</th>
+            <th class="text-end"></th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for m in materiales %}
+            <tr>
+              <td class="fw-bold">{{ m.nombre }}</td>
+              <td class="text-white-50">{{ m.categoria.nombre }}</td>
+              <td class="text-white-50">{{ m.unidad }}</td>
+              <td class="text-end">${{ m.costo_defecto }}</td>
+              <td class="text-end">{% if m.activo %}Sí{% else %}No{% endif %}</td>
+              <td class="text-end">
+                <a class="btn btn-sm btn-outline-light" href="{% url 'editar_material' m.id %}">Editar</a>
+              </td>
+            </tr>
+          {% empty %}
+            <tr><td colspan="6" class="text-white-50">No hay materiales creados.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+{% endblock %}

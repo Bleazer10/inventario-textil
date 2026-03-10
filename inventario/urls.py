@@ -17,4 +17,18 @@ urlpatterns = [
     path("categorias-producto/<int:categoria_id>/editar/", views.editar_categoria_producto, name="editar_categoria_producto"),
 
     path("movimientos/", views.movimientos, name="movimientos"),
+    path("inventario/movimientos/", views.movimientos_inventario, name="movimientos_inventario"),
+
+    # Materiales
+    path("categorias-material/", views.lista_categorias_material, name="lista_categorias_material"),
+    path("categorias-material/nueva/", views.nueva_categoria_material, name="nueva_categoria_material"),
+    path("categorias-material/<int:categoria_id>/editar/", views.editar_categoria_material, name="editar_categoria_material"),
+
+    path("materiales/", views.lista_materiales, name="lista_materiales"),
+    path("materiales/nuevo/", views.nuevo_material, name="nuevo_material"),
+    path("materiales/<int:material_id>/editar/", views.editar_material, name="editar_material"),
+
+    path("almacenes/", views.lista_almacenes, name="lista_almacenes"),
+    path("almacenes/nuevo/", views.nuevo_almacen, name="nuevo_almacen"),
+    path("almacenes/<int:almacen_id>/editar/", views.editar_almacen, name="editar_almacen"),
     ]
