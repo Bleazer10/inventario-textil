@@ -1,0 +1,80 @@
+{% extends "base.html" %}
+
+{% block titulo %}Ítems de inventario{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <div>
+    <h2 class="fw-black mb-0">Ítems de inventario</h2>
+    <div class="text-white-50">Define qué materiales y productos se controlan por almacén</div>
+  </div>
+
+  <a class="btn btn-bemore fw-bold" href="{% url 'nuevo_item_inventario' %}">
+    <i class="fa-solid fa-plus me-2"></i> Nuevo ítem
+  </a>
+</div>
+
+<div class="card card-bemore mb-3">
+  <div class="card-body">
+    <form method="get" class="d-flex gap-2">
+      <input class="form-control" name="q" value="{{ q }}" placeholder="Buscar por almacén, material, SKU, producto...">
+      <button class="btn btn-outline-light fw-bold" type="submit">
+        <i class="fa-solid fa-magnifying-glass me-2"></i> Buscar
+      </button>
+    </form>
+  </div>
+</div>
+
+<div class="card card-bemore">
+  <div class="card-header">Listado</div>
+  <div class="card-body">
+    <div class="table-responsive">
+      <table class="table table-bemore align-middle">
+        <thead>
+          <tr>
+            <th>Almacén</th>
+            <th>Tipo</th>
+            <th>Material / Producto</th>
+            <th class="text-end">Punto reorden</th>
+            <th class="text-end">Activo</th>
+            <th class="text-end"></th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for it in items %}
+            <tr>
+              <td class="fw-bold">{{ it.almacen.nombre }}</td>
+              <td class="text-white-50">{{ it.get_tipo_display }}</td>
+
+              <td>
+                {% if it.tipo == "MATERIAL" and it.material %}
+                  <span class="badge text-bg-secondary">Material</span>
+                  {{ it.material.nombre }}
+                {% else %}
+                  <span class="badge text-bg-info">Producto</span>
+                  {{ it.variante_producto.producto.nombre }} - {{ it.variante_producto.nombre }}
+                  <div class="text-white-50 small">SKU: {{ it.variante_producto.sku }}</div>
+                {% endif %}
+              </td>
+
+              <td class="text-end">{{ it.punto_reorden }}</td>
+              <td class="text-end">{% if it.activo %}Sí{% else %}No{% endif %}</td>
+              <td class="text-end">
+                <a class="btn btn-sm btn-outline-light" href="{% url 'editar_item_inventario' it.id %}">
+                  Editar
+                </a>
+              </td>
+            </tr>
+          {% empty %}
+            <tr><td colspan="6" class="text-white-50">No hay ítems de inventario creados.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<div class="text-white-50 small mt-2">
+  Tip: crea ítems para materiales (para entradas/salidas) y para variantes (para vender con inventario).
+</div>
+{% endblock %}

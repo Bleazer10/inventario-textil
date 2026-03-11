@@ -1,0 +1,99 @@
+{% extends "base.html" %}
+
+{% block titulo %}{% if modo == "nueva" %}Nuevo ítem{% else %}Editar ítem{% endif %}{% endblock %}
+
+{% block content %}
+<div class="mb-3">
+  <h2 class="fw-black mb-0">{% if modo == "nueva" %}Nuevo ítem de inventario{% else %}Editar ítem de inventario{% endif %}</h2>
+  <div class="text-white-50">Define si controlas un material o un producto terminado en un almacén.</div>
+</div>
+
+<div class="row justify-content-center">
+  <div class="col-12 col-lg-7">
+    <div class="card card-bemore">
+      <div class="card-header text-center">Formulario</div>
+      <div class="card-body">
+        <form method="post" novalidate>
+          {% csrf_token %}
+
+          <div class="mb-3">
+            <label class="form-label">Almacén</label>
+            {{ form.almacen }}
+          </div>
+
+          <div class="mb-3">
+            <label class="form-label">Tipo</label>
+            {{ form.tipo }}
+          </div>
+
+          <div class="mb-3" id="wrap_material">
+            <label class="form-label">Material</label>
+            {{ form.material }}
+          </div>
+
+          <div class="mb-3" id="wrap_variante">
+            <label class="form-label">Variante de producto</label>
+            {{ form.variante_producto }}
+          </div>
+
+          <div class="mb-3">
+            <label class="form-label">Punto de reorden</label>
+            {{ form.punto_reorden }}
+            <div class="text-white-50 small">Cantidad mínima para alertas (opcional).</div>
+          </div>
+
+          <div class="form-check mb-3">
+            {{ form.activo }}
+            <label class="form-check-label">Activo</label>
+          </div>
+
+          <button class="btn btn-bemore w-100 fw-bold" type="submit">
+            <i class="fa-solid fa-floppy-disk me-2"></i> Guardar
+          </button>
+
+          <a class="btn btn-outline-light w-100 mt-2" href="{% url 'lista_items_inventario' %}">Volver</a>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  const addFC = (id) => { const el = document.getElementById(id); if(el) el.classList.add("form-control"); }
+  addFC("id_almacen");
+  addFC("id_tipo");
+  addFC("id_material");
+  addFC("id_variante_producto");
+  addFC("id_punto_reorden");
+
+  const activo = document.getElementById("id_activo");
+  if(activo) activo.classList.add("form-check-input");
+
+  const tipo = document.getElementById("id_tipo");
+  const wrapMat = document.getElementById("wrap_material");
+  const wrapVar = document.getElementById("wrap_variante");
+
+  function toggle(){
+    const v = tipo.value;
+    if(v === "MATERIAL"){
+      wrapMat.style.display = "block";
+      wrapVar.style.display = "none";
+      const vp = document.getElementById("id_variante_producto");
+      if(vp) vp.value = "";
+    } else if(v === "PRODUCTO"){
+      wrapMat.style.display = "none";
+      wrapVar.style.display = "block";
+      const mat = document.getElementById("id_material");
+      if(mat) mat.value = "";
+    } else {
+      wrapMat.style.display = "block";
+      wrapVar.style.display = "block";
+    }
+  }
+
+  if(tipo){
+    tipo.addEventListener("change", toggle);
+    toggle();
+  }
+</script>
+{% endblock %}

@@ -7,8 +7,8 @@ from django.contrib.auth.decorators import login_required
 from django.shortcuts import render, redirect, get_object_or_404
 
 from django.db.models import Q
-from .forms import ProductoForm, VarianteProductoForm, CategoriaProductoForm, CategoriaMaterialForm, MaterialForm, AlmacenForm
-from .models import Producto, VarianteProducto, CategoriaProducto, Venta, Gasto, CuentaPorCobrar, CuentaPorPagarCompra, CuentaPorPagarGasto, MovimientoInventario, Almacen, CategoriaMaterial, Material, Almacen
+from .forms import ProductoForm, VarianteProductoForm, CategoriaProductoForm, CategoriaMaterialForm, MaterialForm, AlmacenForm, ItemInventarioForm
+from .models import Producto, VarianteProducto, CategoriaProducto, Venta, Gasto, CuentaPorCobrar, CuentaPorPagarCompra, CuentaPorPagarGasto, MovimientoInventario, Almacen, CategoriaMaterial, Material, Almacen, ItemInventario
 
 from django.db.models import Sum
 
@@ -557,3 +557,56 @@ def editar_almacen(request, almacen_id):
         form = AlmacenForm(instance=almacen)
 
     return render(request, "almacenes/form.html", {"form": form, "modo": "editar", "almacen": almacen})
+
+@login_required
+def lista_items_inventario(request):
+    q = request.GET.get("q", "").strip()
+
+    items = (
+        ItemInventario.objects
+        .select_related("almacen", "material", "variante_producto", "variante_producto__producto")
+        .order_by("almacen__nombre", "tipo")
+    )
+
+    if q:
+        items = items.filter(
+            Q(material__nombre__icontains=q) |
+            Q(variante_producto__sku__icontains=q) |
+            Q(variante_producto__producto__nombre__icontains=q) |
+            Q(variante_producto__nombre__icontains=q) |
+            Q(almacen__nombre__icontains=q)
+        )
+
+    return render(request, "items_inventario/lista.html", {"items": items, "q": q})
+
+
+@login_required
+def nuevo_item_inventario(request):
+    if request.method == "POST":
+        form = ItemInventarioForm(request.POST)
+        if form.is_valid():
+            form.save()
+            messages.success(request, "Ítem de inventario creado correctamente.")
+            return redirect("lista_items_inventario")
+        messages.error(request, "Revisa los datos del formulario.")
+    else:
+        form = ItemInventarioForm()
+
+    return render(request, "items_inventario/form.html", {"form": form, "modo": "nueva"})
+
+
+@login_required
+def editar_item_inventario(request, item_id):
+    item = get_object_or_404(ItemInventario, id=item_id)
+
+    if request.method == "POST":
+        form = ItemInventarioForm(request.POST, instance=item)
+        if form.is_valid():
+            form.save()
+            messages.success(request, "Ítem de inventario actualizado correctamente.")
+            return redirect("lista_items_inventario")
+        messages.error(request, "Revisa los datos del formulario.")
+    else:
+        form = ItemInventarioForm(instance=item)
+
+    return render(request, "items_inventario/form.html", {"form": form, "modo": "editar", "item": item})

@@ -31,4 +31,8 @@ urlpatterns = [
     path("almacenes/", views.lista_almacenes, name="lista_almacenes"),
     path("almacenes/nuevo/", views.nuevo_almacen, name="nuevo_almacen"),
     path("almacenes/<int:almacen_id>/editar/", views.editar_almacen, name="editar_almacen"),
+
+    path("inventario/items/", views.lista_items_inventario, name="lista_items_inventario"),
+    path("inventario/items/nuevo/", views.nuevo_item_inventario, name="nuevo_item_inventario"),
+    path("inventario/items/<int:item_id>/editar/", views.editar_item_inventario, name="editar_item_inventario"),
     ]
