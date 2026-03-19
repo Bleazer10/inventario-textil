@@ -35,4 +35,6 @@ urlpatterns = [
     path("inventario/items/", views.lista_items_inventario, name="lista_items_inventario"),
     path("inventario/items/nuevo/", views.nuevo_item_inventario, name="nuevo_item_inventario"),
     path("inventario/items/<int:item_id>/editar/", views.editar_item_inventario, name="editar_item_inventario"),
+    path("inventario/ajuste/", views.ajuste_inventario, name="ajuste_inventario"),
+    path("inventario/existencias/", views.existencias, name="existencias"),
     ]

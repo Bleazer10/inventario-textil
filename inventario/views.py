@@ -1,26 +1,58 @@
 import json
 from decimal import Decimal
-from datetime import date, timedelta, datetime
+from datetime import date, timedelta, datetime, time
 
+from django.utils import timezone
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.shortcuts import render, redirect, get_object_or_404
 
-from django.db.models import Q
-from .forms import ProductoForm, VarianteProductoForm, CategoriaProductoForm, CategoriaMaterialForm, MaterialForm, AlmacenForm, ItemInventarioForm
-from .models import Producto, VarianteProducto, CategoriaProducto, Venta, Gasto, CuentaPorCobrar, CuentaPorPagarCompra, CuentaPorPagarGasto, MovimientoInventario, Almacen, CategoriaMaterial, Material, Almacen, ItemInventario
+from django.db.models import Q, Sum, Case, When, F, Value, DecimalField
+from django.db.models.functions import Coalesce
 
-from django.db.models import Sum
-
+from .forms import (
+    ProductoForm,
+    VarianteProductoForm,
+    CategoriaProductoForm,
+    CategoriaMaterialForm,
+    MaterialForm,
+    AlmacenForm,
+    ItemInventarioForm,
+    AjusteInventarioForm,
+)
 
 from .models import (
-    Cliente,
+    # Catálogo
+    CategoriaProducto,
+    Producto,
     VarianteProducto,
+
+    # Ventas / Gastos
+    Cliente,
     Venta,
     DetalleVenta,
     CategoriaGasto,
     Gasto,
+
+    # Finanzas
+    CuentaPorCobrar,
+    CuentaPorPagarCompra,
+    CuentaPorPagarGasto,
+
+    # Inventario
+    CategoriaMaterial,
+    Material,
+    Almacen,
+    ItemInventario,
+    MovimientoInventario,
 )
+
+def obtener_almacen_principal():
+    almacen, _ = Almacen.objects.get_or_create(
+        nombre="Principal",
+        defaults={"activo": True},
+    )
+    return almacen
 
 @login_required
 def lista_categorias_producto(request):
@@ -216,6 +248,7 @@ def nueva_venta(request):
             saldo_pendiente=saldo_pendiente,
         )
 
+        # Guardar detalles
         for variante, cantidad, precio_unitario, subtotal in detalles_a_crear:
             DetalleVenta.objects.create(
                 venta=venta,
@@ -226,6 +259,33 @@ def nueva_venta(request):
                 subtotal=subtotal,
             )
 
+        # ✅ DESCONTAR INVENTARIO (1 almacén: Principal)
+        almacen_principal = obtener_almacen_principal()
+
+        for variante, cantidad, precio_unitario, subtotal in detalles_a_crear:
+            # Solo descuenta si el producto controla inventario
+            if not variante.producto.controla_inventario:
+                continue
+
+            # Crear o buscar ItemInventario del producto terminado en el almacén Principal
+            item, _ = ItemInventario.objects.get_or_create(
+                almacen=almacen_principal,
+                tipo=ItemInventario.TipoItem.PRODUCTO,
+                variante_producto=variante,
+                defaults={"punto_reorden": 0, "activo": True},
+            )
+
+            # Registrar salida por venta
+            MovimientoInventario.objects.create(
+                item=item,
+                tipo=MovimientoInventario.TipoMovimiento.SALIDA,
+                cantidad=cantidad,
+                costo_unitario=None,
+                referencia="VENTA",
+                referencia_id=venta.id,
+                nota="Salida automática por venta",
+            )
+
         messages.success(request, f"Venta #{venta.id} guardada correctamente. Total: ${total}")
         return redirect("dashboard")
 
@@ -233,7 +293,6 @@ def nueva_venta(request):
         "clientes": clientes,
         "variantes": variantes,
     })
-
 
 @login_required
 def nuevo_gasto(request):
@@ -361,26 +420,33 @@ def movimientos_inventario(request):
     almacen_id = request.GET.get("almacen", "").strip()
     q = request.GET.get("q", "").strip()
 
-    fi = request.GET.get("fi", "")
-    ff = request.GET.get("ff", "")
+    fi = request.GET.get("fi", "").strip()
+    ff = request.GET.get("ff", "").strip()
 
     # Rango por defecto: últimos 30 días
-    hoy = datetime.now().date()
-    if not fi:
-        fi_date = hoy - timedelta(days=30)
-    else:
+    hoy = timezone.localdate()
+
+    # Calcular fi_date
+    if fi:
         try:
             fi_date = datetime.strptime(fi, "%Y-%m-%d").date()
-        except:
+        except ValueError:
             fi_date = hoy - timedelta(days=30)
-
-    if not ff:
-        ff_date = hoy
     else:
+        fi_date = hoy - timedelta(days=30)
+
+    # Calcular ff_date
+    if ff:
         try:
             ff_date = datetime.strptime(ff, "%Y-%m-%d").date()
-        except:
+        except ValueError:
             ff_date = hoy
+    else:
+        ff_date = hoy
+
+    # Convertimos a datetimes (inicio del día y fin del día exclusivo)
+    inicio_dt = timezone.make_aware(datetime.combine(fi_date, time.min))
+    fin_dt = timezone.make_aware(datetime.combine(ff_date + timedelta(days=1), time.min))
 
     movimientos = (
         MovimientoInventario.objects
@@ -391,7 +457,7 @@ def movimientos_inventario(request):
             "item__variante_producto",
             "item__variante_producto__producto",
         )
-        .filter(creado__date__gte=fi_date, creado__date__lte=ff_date)
+        .filter(creado__gte=inicio_dt, creado__lt=fin_dt)
         .order_by("-creado")
     )
 
@@ -413,7 +479,7 @@ def movimientos_inventario(request):
     almacenes = Almacen.objects.filter(activo=True).order_by("nombre")
 
     return render(request, "inventario/movimientos_inventario.html", {
-        "movimientos": movimientos[:300],  # límite visual para no cargar demasiado
+        "movimientos": movimientos[:300],
         "almacenes": almacenes,
 
         "tipo": tipo,
@@ -610,3 +676,86 @@ def editar_item_inventario(request, item_id):
         form = ItemInventarioForm(instance=item)
 
     return render(request, "items_inventario/form.html", {"form": form, "modo": "editar", "item": item})
+
+@login_required
+def ajuste_inventario(request):
+    if request.method == "POST":
+        form = AjusteInventarioForm(request.POST)
+        if form.is_valid():
+            item = form.cleaned_data["item"]
+            tipo = form.cleaned_data["tipo"]
+            cantidad = form.cleaned_data["cantidad"]
+            costo_unitario = form.cleaned_data.get("costo_unitario")
+            nota = form.cleaned_data.get("nota") or ""
+
+            MovimientoInventario.objects.create(
+                item=item,
+                tipo=tipo,
+                cantidad=cantidad,
+                costo_unitario=costo_unitario if costo_unitario is not None else None,
+                referencia="AJUSTE_MANUAL",
+                referencia_id=None,
+                nota=nota,
+            )
+
+            messages.success(request, "Movimiento creado correctamente.")
+            return redirect("movimientos_inventario")
+        messages.error(request, "Revisa los datos del formulario.")
+    else:
+        form = AjusteInventarioForm()
+
+    return render(request, "inventario/ajuste_inventario.html", {"form": form})
+
+@login_required
+def existencias(request):
+    almacen_id = request.GET.get("almacen", "").strip()
+    tipo_item = request.GET.get("tipo", "").strip()  # MATERIAL / PRODUCTO / ""
+    q = request.GET.get("q", "").strip()
+
+    items = (
+        ItemInventario.objects
+        .select_related("almacen", "material", "variante_producto", "variante_producto__producto")
+        .filter(activo=True)
+    )
+
+    if almacen_id:
+        items = items.filter(almacen_id=almacen_id)
+
+    if tipo_item:
+        items = items.filter(tipo=tipo_item)
+
+    if q:
+        items = items.filter(
+            Q(material__nombre__icontains=q) |
+            Q(variante_producto__sku__icontains=q) |
+            Q(variante_producto__producto__nombre__icontains=q) |
+            Q(variante_producto__nombre__icontains=q) |
+            Q(almacen__nombre__icontains=q)
+        )
+
+    # Stock = sum( +cantidad si ENTRADA/AJUSTE, -cantidad si SALIDA )
+    items = items.annotate(
+        stock=Coalesce(
+            Sum(
+                Case(
+                    When(movimientos__tipo="SALIDA", then=F("movimientos__cantidad") * Value(Decimal("-1"))),
+                    When(movimientos__tipo="ENTRADA", then=F("movimientos__cantidad")),
+                    When(movimientos__tipo="AJUSTE", then=F("movimientos__cantidad")),
+                    # TRASLADO lo dejamos fuera por ahora (o suma 0)
+                    default=Value(Decimal("0.00")),
+                    output_field=DecimalField(max_digits=12, decimal_places=2),
+                )
+            ),
+            Value(Decimal("0.00")),
+        )
+    ).order_by("almacen__nombre", "tipo")
+
+    almacenes = Almacen.objects.filter(activo=True).order_by("nombre")
+
+    return render(request, "inventario/existencias.html", {
+        "items": items,
+        "almacenes": almacenes,
+        "almacen_id": almacen_id,
+        "tipo_item": tipo_item,
+        "q": q,
+    })

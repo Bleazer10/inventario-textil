@@ -58,3 +58,25 @@ class ItemInventarioForm(forms.ModelForm):
                 raise forms.ValidationError("Si el tipo es PRODUCTO, no debes seleccionar un material.")
 
         return cleaned
+    
+class AjusteInventarioForm(forms.Form):
+    item = forms.ModelChoiceField(
+        label="Ítem",
+        queryset=ItemInventario.objects.select_related(
+            "almacen", "material", "variante_producto", "variante_producto__producto"
+        ).filter(activo=True).order_by("almacen__nombre"),
+        required=True
+    )
+
+    tipo = forms.ChoiceField(
+        label="Tipo",
+        choices=[
+            ("ENTRADA", "Entrada"),
+            ("AJUSTE", "Ajuste"),
+        ],
+        required=True
+    )
+
+    cantidad = forms.DecimalField(label="Cantidad", max_digits=12, decimal_places=2, required=True)
+    costo_unitario = forms.DecimalField(label="Costo unitario (opcional)", max_digits=12, decimal_places=2, required=False)
+    nota = forms.CharField(label="Nota (opcional)", required=False, widget=forms.Textarea(attrs={"rows": 2}))

@@ -1,0 +1,70 @@
+{% extends "base.html" %}
+
+{% block titulo %}Stock inicial / Ajuste{% endblock %}
+
+{% block content %}
+<div class="mb-3">
+  <h2 class="fw-black mb-0">Stock inicial / Ajuste</h2>
+  <div class="text-white-50">Crea una entrada o ajuste manual para un material o producto.</div>
+</div>
+
+<div class="row justify-content-center">
+  <div class="col-12 col-lg-7">
+    <div class="card card-bemore">
+      <div class="card-header text-center">Crear movimiento</div>
+      <div class="card-body">
+        <form method="post" novalidate>
+          {% csrf_token %}
+
+          <div class="mb-3">
+            <label class="form-label">Ítem</label>
+            {{ form.item }}
+            <div class="text-white-50 small">Selecciona el almacén y el material/producto.</div>
+          </div>
+
+          <div class="mb-3">
+            <label class="form-label">Tipo</label>
+            {{ form.tipo }}
+          </div>
+
+          <div class="mb-3">
+            <label class="form-label">Cantidad</label>
+            {{ form.cantidad }}
+          </div>
+
+          <div class="mb-3">
+            <label class="form-label">Costo unitario (opcional)</label>
+            {{ form.costo_unitario }}
+            <div class="text-white-50 small">Útil en entradas de material para estimar costos.</div>
+          </div>
+
+          <div class="mb-3">
+            <label class="form-label">Nota (opcional)</label>
+            {{ form.nota }}
+          </div>
+
+          <button class="btn btn-bemore w-100 fw-bold" type="submit">
+            <i class="fa-solid fa-plus me-2"></i> Guardar movimiento
+          </button>
+
+          <a class="btn btn-outline-light w-100 mt-2" href="{% url 'movimientos_inventario' %}">
+            Ver movimientos de inventario
+          </a>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  // Estilo bootstrap para campos de Django
+  const addFC = (id) => { const el = document.getElementById(id); if(el) el.classList.add("form-control"); }
+  addFC("id_item");
+  addFC("id_tipo");
+  addFC("id_cantidad");
+  addFC("id_costo_unitario");
+
+  const nota = document.getElementById("id_nota");
+  if(nota) nota.classList.add("form-control");
+</script>
+{% endblock %}

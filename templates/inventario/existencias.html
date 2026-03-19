@@ -1,0 +1,129 @@
+{% extends "base.html" %}
+
+{% block titulo %}Existencias{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <div>
+    <h2 class="fw-black mb-0">Existencias</h2>
+    <div class="text-white-50">Stock actual por almacén (calculado desde movimientos)</div>
+  </div>
+
+  <div class="d-flex gap-2">
+    <a class="btn btn-outline-light fw-bold" href="{% url 'movimientos_inventario' %}">
+      <i class="fa-solid fa-right-left me-2"></i> Movimientos
+    </a>
+    <a class="btn btn-bemore fw-bold" href="{% url 'ajuste_inventario' %}">
+      <i class="fa-solid fa-sliders me-2"></i> Stock inicial / Ajuste
+    </a>
+  </div>
+</div>
+
+<div class="card card-bemore mb-3">
+  <div class="card-header">Filtros</div>
+  <div class="card-body">
+    <form method="get" class="row g-2 align-items-end">
+      <div class="col-12 col-md-3">
+        <label class="form-label">Almacén</label>
+        <select name="almacen" class="form-control">
+          <option value="">Todos</option>
+          {% for a in almacenes %}
+            <option value="{{ a.id }}" {% if almacen_id|stringformat:"s" == a.id|stringformat:"s" %}selected{% endif %}>
+              {{ a.nombre }}
+            </option>
+          {% endfor %}
+        </select>
+      </div>
+
+      <div class="col-12 col-md-3">
+        <label class="form-label">Tipo</label>
+        <select name="tipo" class="form-control">
+          <option value="">Todos</option>
+          <option value="MATERIAL" {% if tipo_item == "MATERIAL" %}selected{% endif %}>Material</option>
+          <option value="PRODUCTO" {% if tipo_item == "PRODUCTO" %}selected{% endif %}>Producto terminado</option>
+        </select>
+      </div>
+
+      <div class="col-12 col-md-4">
+        <label class="form-label">Buscar</label>
+        <input type="text" name="q" class="form-control" value="{{ q }}" placeholder="Material, SKU, producto...">
+      </div>
+
+      <div class="col-12 col-md-2 d-flex gap-2">
+        <button class="btn btn-bemore fw-bold w-100" type="submit">
+          <i class="fa-solid fa-filter me-2"></i> Aplicar
+        </button>
+        <a class="btn btn-outline-light fw-bold w-100" href="{% url 'existencias' %}">
+          Limpiar
+        </a>
+      </div>
+    </form>
+  </div>
+</div>
+
+<div class="card card-bemore">
+  <div class="card-header">Stock actual</div>
+  <div class="card-body">
+    <div class="table-responsive">
+      <table class="table table-bemore align-middle">
+        <thead>
+          <tr>
+            <th>Almacén</th>
+            <th>Tipo</th>
+            <th>Ítem</th>
+            <th class="text-end">Stock</th>
+            <th class="text-end">Punto reorden</th>
+            <th class="text-end">Estado</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for it in items %}
+            {% with stock=it.stock %}
+            <tr>
+              <td class="fw-bold">{{ it.almacen.nombre }}</td>
+              <td class="text-white-50">{{ it.get_tipo_display }}</td>
+
+              <td>
+                {% if it.tipo == "MATERIAL" and it.material %}
+                  <span class="badge text-bg-secondary">Material</span>
+                  {{ it.material.nombre }}
+                  <div class="text-white-50 small">Unidad: {{ it.material.unidad }}</div>
+                {% else %}
+                  <span class="badge text-bg-info">Producto</span>
+                  {{ it.variante_producto.producto.nombre }} - {{ it.variante_producto.nombre }}
+                  <div class="text-white-50 small">SKU: {{ it.variante_producto.sku }}</div>
+                {% endif %}
+              </td>
+
+              <td class="text-end fw-black">
+                {{ stock }}
+              </td>
+
+              <td class="text-end">
+                {{ it.punto_reorden }}
+              </td>
+
+              <td class="text-end">
+                {% if it.punto_reorden > 0 and stock <= it.punto_reorden %}
+                  <span class="badge text-bg-danger">Bajo</span>
+                {% else %}
+                  <span class="badge text-bg-success">OK</span>
+                {% endif %}
+              </td>
+            </tr>
+            {% endwith %}
+          {% empty %}
+            <tr>
+              <td colspan="6" class="text-white-50">No hay ítems de inventario para mostrar con estos filtros.</td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+
+    <div class="text-white-50 small mt-2">
+      * El stock se calcula sumando ENTRADAS/AJUSTES y restando SALIDAS.
+    </div>
+  </div>
+</div>
+{% endblock %}
