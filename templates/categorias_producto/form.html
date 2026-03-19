@@ -4,6 +4,16 @@
   {% if modo == "nueva" %}Nueva categoría{% else %}Editar categoría{% endif %}
 {% endblock %}
 
+{% block breadcrumbs %}
+<nav aria-label="breadcrumb">
+  <ol class="breadcrumb">
+    <li class="breadcrumb-item"><a href="{% url 'dashboard' %}"><i class="fa-solid fa-home"></i></a></li>
+    <li class="breadcrumb-item"><a href="{% url 'lista_categorias_producto' %}">Categorías de producto</a></li>
+    <li class="breadcrumb-item active">{% if modo == "nueva" %}Nueva categoría{% else %}Editar categoría{% endif %}</li>
+  </ol>
+</nav>
+{% endblock %}
+
 {% block content %}
 <div class="mb-3">
   <h2 class="fw-black mb-0">

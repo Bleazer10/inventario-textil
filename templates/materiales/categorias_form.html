@@ -2,6 +2,17 @@
 
 {% block titulo %}{% if modo == "nueva" %}Nueva categoría de material{% else %}Editar categoría de material{% endif %}{% endblock %}
 
+{% block breadcrumbs %}
+<nav aria-label="breadcrumb">
+  <ol class="breadcrumb">
+    <li class="breadcrumb-item"><a href="{% url 'dashboard' %}"><i class="fa-solid fa-home"></i></a></li>
+    <li class="breadcrumb-item"><a href="{% url 'lista_materiales' %}">Materiales</a></li>
+    <li class="breadcrumb-item"><a href="{% url 'lista_categorias_material' %}">Categorías</a></li>
+    <li class="breadcrumb-item active">{% if modo == "nueva" %}Nueva categoría{% else %}Editar categoría{% endif %}</li>
+  </ol>
+</nav>
+{% endblock %}
+
 {% block content %}
 <div class="mb-3">
   <h2 class="fw-black mb-0">

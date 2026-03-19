@@ -30,7 +30,7 @@
 
           <div class="mb-3">
             <label class="form-label">Fecha</label>
-            <input type="date" name="fecha" class="form-control" required>
+            <input type="date" name="fecha" class="form-control" required value="{% now 'Y-m-d' %}">
           </div>
 
           <div class="mb-3">
@@ -60,7 +60,7 @@
             <select class="form-control" id="variante_select">
               <option value="">Selecciona...</option>
               {% for v in variantes %}
-                <option value="{{ v.id }}" data-precio="{{ v.precio_venta_efectivo }}">
+                <option value="{{ v.id }}" data-precio="{{ v.precio_venta_efectivo|floatformat:2 }}">
                   {{ v.producto.nombre }} - {{ v.nombre }} (SKU: {{ v.sku }}) - ${{ v.precio_venta_efectivo }}
                 </option>
               {% endfor %}
@@ -174,17 +174,24 @@
     render();
   }
 
-  btnAgregar.addEventListener("click", () => {
+   btnAgregar.addEventListener("click", () => {
     const opt = selectVariante.options[selectVariante.selectedIndex];
     const varianteId = selectVariante.value;
-    const precio = Number(opt?.dataset?.precio || 0);
-    const cantidad = Number(inputCantidad.value || 0);
+
+    const rawPrecio = (opt?.dataset?.precio || "0").toString().replace(",", ".");
+    const precio = parseFloat(rawPrecio);
+
+    const cantidad = parseFloat((inputCantidad.value || "0").toString().replace(",", "."));
 
     if(!varianteId){
       alert("Selecciona un producto.");
       return;
     }
-    if(cantidad <= 0){
+    if(isNaN(precio) || precio <= 0){
+      alert("Precio inválido en esta variante. Revisa el precio de venta.");
+      return;
+    }
+    if(isNaN(cantidad) || cantidad <= 0){
       alert("Cantidad inválida.");
       return;
     }
@@ -202,7 +209,6 @@
     selectVariante.value = "";
     inputCantidad.value = 1;
   });
-
-  render();
 </script>
+
 {% endblock %}

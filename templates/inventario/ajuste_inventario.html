@@ -2,6 +2,15 @@
 
 {% block titulo %}Stock inicial / Ajuste{% endblock %}
 
+{% block breadcrumbs %}
+<nav aria-label="breadcrumb">
+  <ol class="breadcrumb">
+    <li class="breadcrumb-item"><a href="{% url 'dashboard' %}"><i class="fa-solid fa-home"></i></a></li>
+    <li class="breadcrumb-item active">Stock inicial / Ajuste</li>
+  </ol>
+</nav>
+{% endblock %}
+
 {% block content %}
 <div class="mb-3">
   <h2 class="fw-black mb-0">Stock inicial / Ajuste</h2>
