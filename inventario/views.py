@@ -5,6 +5,7 @@ from datetime import date, timedelta, datetime, time
 from django.utils import timezone
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
+from django.views.decorators.http import require_POST
 from django.shortcuts import render, redirect, get_object_or_404
 
 from django.db.models import Q, Sum, Case, When, F, Value, DecimalField
@@ -18,7 +19,7 @@ from .forms import (
     MaterialForm,
     AlmacenForm,
     ItemInventarioForm,
-    AjusteInventarioForm,
+    AjusteInventarioForm, ClienteForm, ProveedorForm, DetalleFormulaForm, FormulaForm
 )
 
 from .models import (
@@ -44,7 +45,7 @@ from .models import (
     Material,
     Almacen,
     ItemInventario,
-    MovimientoInventario,
+    MovimientoInventario, Compra, DetalleCompra, Proveedor, Formula, DetalleFormula
 )
 
 def obtener_almacen_principal():
@@ -759,3 +760,431 @@ def existencias(request):
         "tipo_item": tipo_item,
         "q": q,
     })
+
+@login_required
+def lista_compras(request):
+    q = (request.GET.get("q") or "").strip()
+    estado = (request.GET.get("estado") or "").strip()
+    estado_pago = (request.GET.get("estado_pago") or "").strip()
+
+    compras = Compra.objects.select_related("proveedor").order_by("-fecha", "-creado")
+
+    if estado:
+        compras = compras.filter(estado=estado)
+
+    if estado_pago:
+        compras = compras.filter(estado_pago=estado_pago)
+
+    if q:
+        compras = compras.filter(
+            Q(proveedor__nombre__icontains=q) |
+            Q(id__icontains=q)
+        )
+
+    return render(request, "compras/lista.html", {
+        "compras": compras,
+        "q": q,
+        "estado": estado,
+        "estado_pago": estado_pago,
+        "estados": Compra.Estado.choices,
+        "estados_pago": Compra.EstadoPago.choices,
+    })
+
+
+@login_required
+def nueva_compra(request):
+    proveedores = Proveedor.objects.filter(activo=True).order_by("nombre")
+    materiales = (
+        Material.objects
+        .filter(activo=True)
+        .select_related("categoria")
+        .order_by("nombre")
+    )
+
+    if request.method == "POST":
+        proveedor_id = request.POST.get("proveedor")
+        fecha = request.POST.get("fecha") or str(date.today())
+        notas = request.POST.get("notas", "")
+        items_json = request.POST.get("items_json", "[]")
+
+        try:
+            items = json.loads(items_json)
+        except json.JSONDecodeError:
+            items = []
+
+        if not proveedor_id:
+            messages.error(request, "Selecciona un proveedor.")
+            return redirect("nueva_compra")
+
+        if not items:
+            messages.error(request, "Agrega al menos un material para guardar la compra.")
+            return redirect("nueva_compra")
+
+        proveedor = get_object_or_404(Proveedor, id=proveedor_id)
+
+        compra = Compra.objects.create(
+            proveedor=proveedor,
+            fecha=fecha,
+            estado=Compra.Estado.BORRADOR,
+            estado_pago=Compra.EstadoPago.PENDIENTE,
+            notas=notas,
+        )
+
+        # Crear detalles
+        creados = 0
+        for it in items:
+            material_id = it.get("material_id")
+            cantidad = Decimal(str(it.get("cantidad", "0")).replace(",", "."))
+            costo_unitario = Decimal(str(it.get("costo_unitario", "0")).replace(",", "."))
+
+            if not material_id or cantidad <= 0 or costo_unitario <= 0:
+                continue
+
+            material = get_object_or_404(Material, id=material_id)
+
+            DetalleCompra.objects.create(
+                compra=compra,
+                material=material,
+                cantidad=cantidad,
+                costo_unitario=costo_unitario,
+            )
+            creados += 1
+
+        if creados == 0:
+            compra.delete()
+            messages.error(request, "No se pudo guardar la compra: revisa cantidades y costos.")
+            return redirect("nueva_compra")
+
+        messages.success(request, f"Compra #{compra.id} creada en BORRADOR.")
+        return redirect("detalle_compra", compra_id=compra.id)
+
+    return render(request, "compras/nueva.html", {
+        "proveedores": proveedores,
+        "materiales": materiales,
+    })
+
+
+@login_required
+def detalle_compra(request, compra_id):
+    compra = get_object_or_404(
+        Compra.objects.select_related("proveedor"),
+        id=compra_id
+    )
+
+    detalles_qs = compra.detalles.select_related("material", "material__categoria").all()
+
+    detalles = []
+    total = Decimal("0.00")
+
+    for d in detalles_qs:
+        subtotal = (d.cantidad * d.costo_unitario).quantize(Decimal("0.01"))
+        total += subtotal
+        detalles.append({
+            "material": d.material,
+            "cantidad": d.cantidad,
+            "costo_unitario": d.costo_unitario,
+            "subtotal": subtotal,
+        })
+
+    total = total.quantize(Decimal("0.01"))
+
+    return render(request, "compras/detalle.html", {
+        "compra": compra,
+        "detalles": detalles,
+        "total": total,
+    })
+
+@require_POST
+@login_required
+def recibir_compra(request, compra_id):
+    compra = get_object_or_404(
+        Compra.objects.select_related("proveedor"),
+        id=compra_id
+    )
+
+    if compra.estado != Compra.Estado.BORRADOR:
+        messages.error(request, "Solo puedes recibir compras en estado BORRADOR.")
+        return redirect("detalle_compra", compra_id=compra.id)
+
+    almacen_principal = obtener_almacen_principal()
+    detalles = compra.detalles.select_related("material").all()
+
+    # Crear ENTRADAS en inventario para cada material
+    for d in detalles:
+        item, _ = ItemInventario.objects.get_or_create(
+            almacen=almacen_principal,
+            tipo=ItemInventario.TipoItem.MATERIAL,
+            material=d.material,
+            defaults={"punto_reorden": 0, "activo": True},
+        )
+
+        MovimientoInventario.objects.create(
+            item=item,
+            tipo=MovimientoInventario.TipoMovimiento.ENTRADA,
+            cantidad=d.cantidad,
+            costo_unitario=d.costo_unitario,
+            referencia="COMPRA",
+            referencia_id=compra.id,
+            nota=f"Entrada por compra #{compra.id}",
+        )
+
+    # Marcar compra como recibida
+    compra.estado = Compra.Estado.RECIBIDA
+    compra.save(update_fields=["estado"])
+
+    messages.success(request, f"Compra #{compra.id} recibida. Inventario actualizado.")
+    return redirect("detalle_compra", compra_id=compra.id)
+
+# -------------------------
+# CLIENTES
+# -------------------------
+@login_required
+def lista_clientes(request):
+    q = request.GET.get("q", "").strip()
+    clientes = Cliente.objects.all().order_by("nombre")
+    if q:
+        clientes = clientes.filter(
+            Q(nombre__icontains=q) |
+            Q(telefono__icontains=q) |
+            Q(email__icontains=q)
+        )
+    return render(request, "terceros/clientes_lista.html", {"clientes": clientes, "q": q})
+
+
+@login_required
+def nuevo_cliente(request):
+    if request.method == "POST":
+        form = ClienteForm(request.POST)
+        if form.is_valid():
+            form.save()
+            messages.success(request, "Cliente creado correctamente.")
+            return redirect("lista_clientes")
+        messages.error(request, "Revisa los datos del formulario.")
+    else:
+        form = ClienteForm()
+    return render(request, "terceros/clientes_form.html", {"form": form, "modo": "nueva"})
+
+
+@login_required
+def editar_cliente(request, cliente_id):
+    cliente = get_object_or_404(Cliente, id=cliente_id)
+    if request.method == "POST":
+        form = ClienteForm(request.POST, instance=cliente)
+        if form.is_valid():
+            form.save()
+            messages.success(request, "Cliente actualizado correctamente.")
+            return redirect("lista_clientes")
+        messages.error(request, "Revisa los datos del formulario.")
+    else:
+        form = ClienteForm(instance=cliente)
+    return render(request, "terceros/clientes_form.html", {"form": form, "modo": "editar", "cliente": cliente})
+
+
+# -------------------------
+# PROVEEDORES
+# -------------------------
+@login_required
+def lista_proveedores(request):
+    q = request.GET.get("q", "").strip()
+    proveedores = Proveedor.objects.all().order_by("nombre")
+    if q:
+        proveedores = proveedores.filter(
+            Q(nombre__icontains=q) |
+            Q(telefono__icontains=q) |
+            Q(email__icontains=q)
+        )
+    return render(request, "terceros/proveedores_lista.html", {"proveedores": proveedores, "q": q})
+
+
+@login_required
+def nuevo_proveedor(request):
+    if request.method == "POST":
+        form = ProveedorForm(request.POST)
+        if form.is_valid():
+            form.save()
+            messages.success(request, "Proveedor creado correctamente.")
+            return redirect("lista_proveedores")
+        messages.error(request, "Revisa los datos del formulario.")
+    else:
+        form = ProveedorForm()
+    return render(request, "terceros/proveedores_form.html", {"form": form, "modo": "nueva"})
+
+
+@login_required
+def editar_proveedor(request, proveedor_id):
+    proveedor = get_object_or_404(Proveedor, id=proveedor_id)
+    if request.method == "POST":
+        form = ProveedorForm(request.POST, instance=proveedor)
+        if form.is_valid():
+            form.save()
+            messages.success(request, "Proveedor actualizado correctamente.")
+            return redirect("lista_proveedores")
+        messages.error(request, "Revisa los datos del formulario.")
+    else:
+        form = ProveedorForm(instance=proveedor)
+    return render(request, "terceros/proveedores_form.html", {"form": form, "modo": "editar", "proveedor": proveedor})
+
+@login_required
+def lista_formulas(request):
+    q = (request.GET.get("q") or "").strip()
+
+    formulas = (
+        Formula.objects
+        .select_related("variante_producto", "variante_producto__producto")
+        .order_by("variante_producto__producto__nombre", "variante_producto__nombre", "nombre")
+    )
+
+    if q:
+        formulas = formulas.filter(
+            Q(nombre__icontains=q) |
+            Q(variante_producto__sku__icontains=q) |
+            Q(variante_producto__nombre__icontains=q) |
+            Q(variante_producto__producto__nombre__icontains=q)
+        )
+
+    return render(request, "formulas/lista.html", {"formulas": formulas, "q": q})
+
+
+@login_required
+def nueva_formula(request):
+    if request.method == "POST":
+        form = FormulaForm(request.POST)
+        if form.is_valid():
+            formula = form.save()
+            messages.success(request, "Fórmula creada correctamente.")
+            return redirect("detalle_formula", formula_id=formula.id)
+        messages.error(request, "Revisa los datos del formulario.")
+    else:
+        form = FormulaForm()
+
+    return render(request, "formulas/form.html", {"form": form, "modo": "nueva"})
+
+
+@login_required
+def editar_formula(request, formula_id):
+    formula = get_object_or_404(Formula, id=formula_id)
+
+    if request.method == "POST":
+        form = FormulaForm(request.POST, instance=formula)
+        if form.is_valid():
+            form.save()
+            messages.success(request, "Fórmula actualizada correctamente.")
+            return redirect("detalle_formula", formula_id=formula.id)
+        messages.error(request, "Revisa los datos del formulario.")
+    else:
+        form = FormulaForm(instance=formula)
+
+    return render(request, "formulas/form.html", {"form": form, "modo": "editar", "formula": formula})
+
+
+def _calcular_costo_estimado_por_unidad(formula: Formula) -> dict:
+    """
+    Costo estimado por unidad usando:
+    - Material.costo_defecto
+    - cantidad_por_unidad
+    - merma_porcentaje
+    + mano de obra unitario
+    + indirecto unitario
+    """
+    detalles = formula.detalles.select_related("material").all()
+
+    costo_materiales = Decimal("0.00")
+    alertas = []
+
+    for d in detalles:
+        costo_mat = d.material.costo_defecto or Decimal("0.00")
+        if costo_mat <= 0:
+            alertas.append(f"Material sin costo_defecto: {d.material.nombre}")
+
+        factor_merma = (Decimal("1.00") + (d.merma_porcentaje or Decimal("0.00")) / Decimal("100.00"))
+        consumo_real = (d.cantidad_por_unidad * factor_merma)
+
+        costo_materiales += (consumo_real * costo_mat)
+
+    costo_materiales = costo_materiales.quantize(Decimal("0.01"))
+
+    mano_obra = (formula.costo_mano_obra_unitario or Decimal("0.00")).quantize(Decimal("0.01"))
+    indirecto = (formula.costo_indirecto_unitario or Decimal("0.00")).quantize(Decimal("0.01"))
+
+    costo_total = (costo_materiales + mano_obra + indirecto).quantize(Decimal("0.01"))
+
+    return {
+        "costo_materiales": costo_materiales,
+        "mano_obra": mano_obra,
+        "indirecto": indirecto,
+        "costo_total": costo_total,
+        "alertas": alertas,
+    }
+
+
+@login_required
+def detalle_formula(request, formula_id):
+    formula = get_object_or_404(
+        Formula.objects.select_related("variante_producto", "variante_producto__producto"),
+        id=formula_id
+    )
+
+    detalles = formula.detalles.select_related("material", "material__categoria").order_by("material__nombre")
+    costos = _calcular_costo_estimado_por_unidad(formula)
+
+    return render(request, "formulas/detalle.html", {
+        "formula": formula,
+        "detalles": detalles,
+        "costos": costos,
+    })
+
+
+@login_required
+def nuevo_detalle_formula(request, formula_id):
+    formula = get_object_or_404(Formula, id=formula_id)
+
+    if request.method == "POST":
+        form = DetalleFormulaForm(request.POST)
+        if form.is_valid():
+            detalle = form.save(commit=False)
+            detalle.formula = formula
+            detalle.save()
+            messages.success(request, "Material agregado a la fórmula.")
+            return redirect("detalle_formula", formula_id=formula.id)
+        messages.error(request, "Revisa los datos del formulario.")
+    else:
+        form = DetalleFormulaForm()
+
+    return render(request, "formulas/detalle_form.html", {
+        "form": form,
+        "formula": formula,
+        "modo": "nueva",
+    })
+
+
+@login_required
+def editar_detalle_formula(request, formula_id, detalle_id):
+    formula = get_object_or_404(Formula, id=formula_id)
+    detalle = get_object_or_404(DetalleFormula, id=detalle_id, formula=formula)
+
+    if request.method == "POST":
+        form = DetalleFormulaForm(request.POST, instance=detalle)
+        if form.is_valid():
+            form.save()
+            messages.success(request, "Material actualizado en la fórmula.")
+            return redirect("detalle_formula", formula_id=formula.id)
+        messages.error(request, "Revisa los datos del formulario.")
+    else:
+        form = DetalleFormulaForm(instance=detalle)
+
+    return render(request, "formulas/detalle_form.html", {
+        "form": form,
+        "formula": formula,
+        "detalle": detalle,
+        "modo": "editar",
+    })
+
+
+@require_POST
+@login_required
+def eliminar_detalle_formula(request, formula_id, detalle_id):
+    formula = get_object_or_404(Formula, id=formula_id)
+    detalle = get_object_or_404(DetalleFormula, id=detalle_id, formula=formula)
+    detalle.delete()
+    messages.success(request, "Material eliminado de la fórmula.")
+    return redirect("detalle_formula", formula_id=formula.id)

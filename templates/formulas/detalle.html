@@ -1,0 +1,105 @@
+{% extends "base.html" %}
+{% block titulo %}Fórmula #{{ formula.id }}{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <div>
+    <h2 class="fw-black mb-0">{{ formula.nombre }}</h2>
+    <div class="text-white-50">
+      {{ formula.variante_producto.producto.nombre }} • {{ formula.variante_producto.nombre }} (SKU: {{ formula.variante_producto.sku }})
+    </div>
+  </div>
+
+  <div class="d-flex gap-2">
+    <a class="btn btn-outline-light fw-bold" href="{% url 'editar_formula' formula.id %}">Editar</a>
+    <a class="btn btn-bemore fw-bold" href="{% url 'nuevo_detalle_formula' formula.id %}">
+      <i class="fa-solid fa-plus me-2"></i> Agregar material
+    </a>
+  </div>
+</div>
+
+{% if costos.alertas %}
+  <div class="alert alert-warning">
+    <div class="fw-bold mb-1">Avisos de costos</div>
+    <ul class="mb-0">
+      {% for a in costos.alertas %}
+        <li>{{ a }}</li>
+      {% endfor %}
+    </ul>
+  </div>
+{% endif %}
+
+<div class="row g-3">
+  <div class="col-lg-5">
+    <div class="card card-bemore">
+      <div class="card-header">Costo estimado por unidad</div>
+      <div class="card-body">
+        <div class="d-flex justify-content-between">
+          <div class="text-white-50">Materiales</div>
+          <div class="fw-black">${{ costos.costo_materiales }}</div>
+        </div>
+        <div class="d-flex justify-content-between">
+          <div class="text-white-50">Mano de obra</div>
+          <div class="fw-black">${{ costos.mano_obra }}</div>
+        </div>
+        <div class="d-flex justify-content-between">
+          <div class="text-white-50">Indirectos</div>
+          <div class="fw-black">${{ costos.indirecto }}</div>
+        </div>
+        <hr class="border-light opacity-25">
+        <div class="d-flex justify-content-between">
+          <div class="text-white-50 fw-bold">Total estimado</div>
+          <div class="fs-4 fw-black">${{ costos.costo_total }}</div>
+        </div>
+        <div class="text-white-50 small mt-2">
+          * Usa <code>Material.costo_defecto</code>. Luego lo mejoramos con costos de compras.
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-lg-7">
+    <div class="card card-bemore">
+      <div class="card-header">Materiales de la fórmula</div>
+      <div class="card-body">
+        <div class="table-responsive">
+          <table class="table table-bemore align-middle">
+            <thead>
+              <tr>
+                <th>Material</th>
+                <th class="text-end">Cant. por unidad</th>
+                <th class="text-end">Merma %</th>
+                <th class="text-end"></th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for d in detalles %}
+                <tr>
+                  <td class="fw-bold">{{ d.material.nombre }}</td>
+                  <td class="text-end">{{ d.cantidad_por_unidad }}</td>
+                  <td class="text-end">{{ d.merma_porcentaje }}</td>
+                  <td class="text-end">
+                    <a class="btn btn-sm btn-outline-light" href="{% url 'editar_detalle_formula' formula.id d.id %}">Editar</a>
+                    <form method="post" action="{% url 'eliminar_detalle_formula' formula.id d.id %}" class="d-inline">
+                      {% csrf_token %}
+                      <button class="btn btn-sm btn-outline-light" type="submit" onclick="return confirm('¿Eliminar este material de la fórmula?')">
+                        <i class="fa-solid fa-trash"></i>
+                      </button>
+                    </form>
+                  </td>
+                </tr>
+              {% empty %}
+                <tr><td colspan="4" class="text-white-50">No hay materiales agregados.</td></tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+
+        <div class="text-white-50 small mt-2">
+          Recomendación: asegúrate de tener los costos por defecto en cada material.
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

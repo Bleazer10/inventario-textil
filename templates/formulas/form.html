@@ -1,0 +1,60 @@
+{% extends "base.html" %}
+{% block titulo %}{% if modo == "nueva" %}Nueva fórmula{% else %}Editar fórmula{% endif %}{% endblock %}
+
+{% block content %}
+<div class="mb-3">
+  <h2 class="fw-black mb-0">{% if modo == "nueva" %}Nueva fórmula{% else %}Editar fórmula{% endif %}</h2>
+  <div class="text-white-50">Selecciona la variante y define costos adicionales</div>
+</div>
+
+<div class="row justify-content-center">
+  <div class="col-12 col-lg-7">
+    <div class="card card-bemore">
+      <div class="card-header text-center">Formulario</div>
+      <div class="card-body">
+        <form method="post" novalidate>
+          {% csrf_token %}
+
+          <div class="mb-3">
+            <label class="form-label">Variante de producto</label>
+            {{ form.variante_producto }}
+          </div>
+
+          <div class="mb-3">
+            <label class="form-label">Nombre</label>
+            {{ form.nombre }}
+          </div>
+
+          <div class="row g-2">
+            <div class="col-md-6">
+              <label class="form-label">Mano de obra (por unidad)</label>
+              {{ form.costo_mano_obra_unitario }}
+            </div>
+            <div class="col-md-6">
+              <label class="form-label">Indirectos (por unidad)</label>
+              {{ form.costo_indirecto_unitario }}
+            </div>
+          </div>
+
+          <div class="form-check mt-3 mb-3">
+            {{ form.activa }}
+            <label class="form-check-label">Activa</label>
+          </div>
+
+          <button class="btn btn-bemore w-100 fw-bold" type="submit">
+            <i class="fa-solid fa-floppy-disk me-2"></i> Guardar
+          </button>
+
+          <a class="btn btn-outline-light w-100 mt-2" href="{% url 'lista_formulas' %}">Volver</a>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  const addFC = (id) => { const el = document.getElementById(id); if(el) el.classList.add("form-control"); }
+  addFC("id_variante_producto"); addFC("id_nombre"); addFC("id_costo_mano_obra_unitario"); addFC("id_costo_indirecto_unitario");
+  const activa = document.getElementById("id_activa"); if(activa) activa.classList.add("form-check-input");
+</script>
+{% endblock %}

@@ -1,0 +1,95 @@
+{% extends "base.html" %}
+
+{% block titulo %}Compras{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <div>
+    <h2 class="fw-black mb-0">Compras</h2>
+    <div class="text-white-50">Listado de compras</div>
+  </div>
+
+  <a class="btn btn-bemore fw-bold" href="{% url 'nueva_compra' %}">
+    <i class="fa-solid fa-plus me-2"></i> Nueva compra
+  </a>
+</div>
+
+<!-- ✅ Filtros -->
+<div class="card card-bemore mb-3">
+  <div class="card-header">Filtros</div>
+  <div class="card-body">
+    <form method="get" class="row g-2 align-items-end">
+      <div class="col-12 col-md-4">
+        <label class="form-label">Buscar</label>
+        <input class="form-control" name="q" value="{{ q }}" placeholder="Proveedor o # compra...">
+      </div>
+
+      <div class="col-6 col-md-3">
+        <label class="form-label">Estado</label>
+        <select class="form-control" name="estado">
+          <option value="">Todos</option>
+          {% for val, label in estados %}
+            <option value="{{ val }}" {% if estado == val %}selected{% endif %}>{{ label }}</option>
+          {% endfor %}
+        </select>
+      </div>
+
+      <div class="col-6 col-md-3">
+        <label class="form-label">Estado pago</label>
+        <select class="form-control" name="estado_pago">
+          <option value="">Todos</option>
+          {% for val, label in estados_pago %}
+            <option value="{{ val }}" {% if estado_pago == val %}selected{% endif %}>{{ label }}</option>
+          {% endfor %}
+        </select>
+      </div>
+
+      <div class="col-12 col-md-2 d-flex gap-2">
+        <button class="btn btn-bemore fw-bold w-100" type="submit">
+          <i class="fa-solid fa-filter me-2"></i> Aplicar
+        </button>
+        <a class="btn btn-outline-light fw-bold w-100" href="{% url 'lista_compras' %}">
+          Limpiar
+        </a>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- ✅ Listado -->
+<div class="card card-bemore">
+  <div class="card-header">Listado</div>
+  <div class="card-body">
+    <div class="table-responsive">
+      <table class="table table-bemore align-middle">
+        <thead>
+          <tr>
+            <th>#</th>
+            <th>Fecha</th>
+            <th>Proveedor</th>
+            <th>Estado</th>
+            <th>Estado pago</th>
+            <th class="text-end"></th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for c in compras %}
+            <tr>
+              <td class="fw-bold">#{{ c.id }}</td>
+              <td class="text-white-50">{{ c.fecha }}</td>
+              <td>{{ c.proveedor.nombre }}</td>
+              <td>{{ c.get_estado_display }}</td>
+              <td>{{ c.get_estado_pago_display }}</td>
+              <td class="text-end">
+                <a class="btn btn-sm btn-outline-light" href="{% url 'detalle_compra' c.id %}">Ver</a>
+              </td>
+            </tr>
+          {% empty %}
+            <tr><td colspan="6" class="text-white-50">No hay compras.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+{% endblock %}

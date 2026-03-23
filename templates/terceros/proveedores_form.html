@@ -1,0 +1,61 @@
+{% extends "base.html" %}
+{% block titulo %}{% if modo == "nueva" %}Nuevo proveedor{% else %}Editar proveedor{% endif %}{% endblock %}
+
+{% block content %}
+<div class="mb-3">
+  <h2 class="fw-black mb-0">{% if modo == "nueva" %}Nuevo proveedor{% else %}Editar proveedor{% endif %}</h2>
+  <div class="text-white-50">Terceros • Proveedores</div>
+</div>
+
+<div class="row justify-content-center">
+  <div class="col-12 col-lg-7">
+    <div class="card card-bemore">
+      <div class="card-header text-center">Formulario</div>
+      <div class="card-body">
+        <form method="post" novalidate>
+          {% csrf_token %}
+
+          <div class="mb-3">
+            <label class="form-label">Nombre</label>
+            {{ form.nombre }}
+          </div>
+
+          <div class="row g-2">
+            <div class="col-md-6">
+              <label class="form-label">Teléfono</label>
+              {{ form.telefono }}
+            </div>
+            <div class="col-md-6">
+              <label class="form-label">Email</label>
+              {{ form.email }}
+            </div>
+          </div>
+
+          <div class="mb-3 mt-2">
+            <label class="form-label">Notas</label>
+            {{ form.notas }}
+          </div>
+
+          <div class="form-check mb-3">
+            {{ form.activo }}
+            <label class="form-check-label">Activo</label>
+          </div>
+
+          <button class="btn btn-bemore w-100 fw-bold" type="submit">
+            <i class="fa-solid fa-floppy-disk me-2"></i> Guardar
+          </button>
+
+          <a class="btn btn-outline-light w-100 mt-2" href="{% url 'lista_proveedores' %}">Volver</a>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  const addFC = (id) => { const el = document.getElementById(id); if(el) el.classList.add("form-control"); }
+  addFC("id_nombre"); addFC("id_telefono"); addFC("id_email"); addFC("id_notas");
+  const activo = document.getElementById("id_activo"); if(activo) activo.classList.add("form-check-input");
+  const notas = document.getElementById("id_notas"); if(notas) notas.setAttribute("rows","3");
+</script>
+{% endblock %}

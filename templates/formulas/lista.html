@@ -1,0 +1,61 @@
+{% extends "base.html" %}
+{% block titulo %}Fórmulas{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <div>
+    <h2 class="fw-black mb-0">Fórmulas</h2>
+    <div class="text-white-50">Define materiales por unidad para producir variantes</div>
+  </div>
+
+  <a class="btn btn-bemore fw-bold" href="{% url 'nueva_formula' %}">
+    <i class="fa-solid fa-plus me-2"></i> Nueva fórmula
+  </a>
+</div>
+
+<div class="card card-bemore mb-3">
+  <div class="card-body">
+    <form method="get" class="d-flex gap-2">
+      <input class="form-control" name="q" value="{{ q }}" placeholder="Buscar por nombre, SKU, producto...">
+      <button class="btn btn-outline-light fw-bold" type="submit">
+        <i class="fa-solid fa-magnifying-glass me-2"></i> Buscar
+      </button>
+    </form>
+  </div>
+</div>
+
+<div class="card card-bemore">
+  <div class="card-header">Listado</div>
+  <div class="card-body">
+    <div class="table-responsive">
+      <table class="table table-bemore align-middle">
+        <thead>
+          <tr>
+            <th>Producto</th>
+            <th>Variante</th>
+            <th>Fórmula</th>
+            <th class="text-end">Activa</th>
+            <th class="text-end"></th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for f in formulas %}
+            <tr>
+              <td class="fw-bold">{{ f.variante_producto.producto.nombre }}</td>
+              <td class="text-white-50">{{ f.variante_producto.nombre }} (SKU: {{ f.variante_producto.sku }})</td>
+              <td>{{ f.nombre }}</td>
+              <td class="text-end">{% if f.activa %}Sí{% else %}No{% endif %}</td>
+              <td class="text-end">
+                <a class="btn btn-sm btn-outline-light" href="{% url 'detalle_formula' f.id %}">Ver</a>
+                <a class="btn btn-sm btn-outline-light" href="{% url 'editar_formula' f.id %}">Editar</a>
+              </td>
+            </tr>
+          {% empty %}
+            <tr><td colspan="5" class="text-white-50">No hay fórmulas.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+{% endblock %}

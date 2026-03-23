@@ -37,4 +37,29 @@ urlpatterns = [
     path("inventario/items/<int:item_id>/editar/", views.editar_item_inventario, name="editar_item_inventario"),
     path("inventario/ajuste/", views.ajuste_inventario, name="ajuste_inventario"),
     path("inventario/existencias/", views.existencias, name="existencias"),
+
+    path("compras/", views.lista_compras, name="lista_compras"),
+    path("compras/nueva/", views.nueva_compra, name="nueva_compra"),
+    path("compras/<int:compra_id>/", views.detalle_compra, name="detalle_compra"),
+    path("compras/<int:compra_id>/recibir/", views.recibir_compra, name="recibir_compra"),
+
+    # Terceros
+    path("terceros/clientes/", views.lista_clientes, name="lista_clientes"),
+    path("terceros/clientes/nuevo/", views.nuevo_cliente, name="nuevo_cliente"),
+    path("terceros/clientes/<int:cliente_id>/editar/", views.editar_cliente, name="editar_cliente"),
+
+    path("terceros/proveedores/", views.lista_proveedores, name="lista_proveedores"),
+    path("terceros/proveedores/nuevo/", views.nuevo_proveedor, name="nuevo_proveedor"),
+    path("terceros/proveedores/<int:proveedor_id>/editar/", views.editar_proveedor, name="editar_proveedor"),
+    
+    # Fórmulas
+    path("formulas/", views.lista_formulas, name="lista_formulas"),
+    path("formulas/nueva/", views.nueva_formula, name="nueva_formula"),
+    path("formulas/<int:formula_id>/editar/", views.editar_formula, name="editar_formula"),
+    path("formulas/<int:formula_id>/", views.detalle_formula, name="detalle_formula"),
+
+    # Detalles de fórmula (materiales)
+    path("formulas/<int:formula_id>/material/nuevo/", views.nuevo_detalle_formula, name="nuevo_detalle_formula"),
+    path("formulas/<int:formula_id>/material/<int:detalle_id>/editar/", views.editar_detalle_formula, name="editar_detalle_formula"),
+    path("formulas/<int:formula_id>/material/<int:detalle_id>/eliminar/", views.eliminar_detalle_formula, name="eliminar_detalle_formula"),
     ]

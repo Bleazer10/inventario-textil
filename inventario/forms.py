@@ -1,5 +1,5 @@
 from django import forms
-from .models import CategoriaProducto, Producto, VarianteProducto, CategoriaMaterial, Material, Almacen, ItemInventario
+from .models import CategoriaProducto, Producto, VarianteProducto, CategoriaMaterial, Material, Almacen, ItemInventario, Cliente, Proveedor, DetalleFormula, Formula
 
 class ProductoForm(forms.ModelForm):
     class Meta:
@@ -80,3 +80,33 @@ class AjusteInventarioForm(forms.Form):
     cantidad = forms.DecimalField(label="Cantidad", max_digits=12, decimal_places=2, required=True)
     costo_unitario = forms.DecimalField(label="Costo unitario (opcional)", max_digits=12, decimal_places=2, required=False)
     nota = forms.CharField(label="Nota (opcional)", required=False, widget=forms.Textarea(attrs={"rows": 2}))
+
+class ClienteForm(forms.ModelForm):
+    class Meta:
+        model = Cliente
+        fields = ["nombre", "telefono", "email", "notas", "activo"]
+
+class ProveedorForm(forms.ModelForm):
+    class Meta:
+        model = Proveedor
+        fields = ["nombre", "telefono", "email", "notas", "activo"]
+
+class FormulaForm(forms.ModelForm):
+    class Meta:
+        model = Formula
+        fields = [
+            "variante_producto",
+            "nombre",
+            "activa",
+            "costo_mano_obra_unitario",
+            "costo_indirecto_unitario",
+        ]
+
+class DetalleFormulaForm(forms.ModelForm):
+    class Meta:
+        model = DetalleFormula
+        fields = [
+            "material",
+            "cantidad_por_unidad",
+            "merma_porcentaje",
+        ]

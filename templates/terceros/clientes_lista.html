@@ -1,0 +1,60 @@
+{% extends "base.html" %}
+{% block titulo %}Clientes{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <div>
+    <h2 class="fw-black mb-0">Clientes</h2>
+    <div class="text-white-50">Terceros • Clientes</div>
+  </div>
+
+  <a class="btn btn-bemore fw-bold" href="{% url 'nuevo_cliente' %}">
+    <i class="fa-solid fa-plus me-2"></i> Nuevo cliente
+  </a>
+</div>
+
+<div class="card card-bemore mb-3">
+  <div class="card-body">
+    <form method="get" class="d-flex gap-2">
+      <input class="form-control" name="q" value="{{ q }}" placeholder="Buscar por nombre, teléfono, email...">
+      <button class="btn btn-outline-light fw-bold" type="submit">
+        <i class="fa-solid fa-magnifying-glass me-2"></i> Buscar
+      </button>
+    </form>
+  </div>
+</div>
+
+<div class="card card-bemore">
+  <div class="card-header">Listado</div>
+  <div class="card-body">
+    <div class="table-responsive">
+      <table class="table table-bemore align-middle">
+        <thead>
+          <tr>
+            <th>Nombre</th>
+            <th>Teléfono</th>
+            <th>Email</th>
+            <th class="text-end">Activo</th>
+            <th class="text-end"></th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for c in clientes %}
+            <tr>
+              <td class="fw-bold">{{ c.nombre }}</td>
+              <td class="text-white-50">{{ c.telefono|default:"-" }}</td>
+              <td class="text-white-50">{{ c.email|default:"-" }}</td>
+              <td class="text-end">{% if c.activo %}Sí{% else %}No{% endif %}</td>
+              <td class="text-end">
+                <a class="btn btn-sm btn-outline-light" href="{% url 'editar_cliente' c.id %}">Editar</a>
+              </td>
+            </tr>
+          {% empty %}
+            <tr><td colspan="5" class="text-white-50">No hay clientes.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+{% endblock %}

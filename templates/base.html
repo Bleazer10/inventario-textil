@@ -95,6 +95,26 @@
               <li><a class="dropdown-item" href="{% url 'existencias' %}">
                 <i class="fa-solid fa-box-open me-1"></i> Existencias
               </a></li>
+              <a class="dropdown-item" href="{% url 'lista_compras' %}">
+                <i class="fa-solid fa-cart-shopping me-1"></i> Compras
+              </a>
+              <li><a class="dropdown-item" href="{% url 'lista_formulas' %}">
+                <i class="fa-solid fa-flask me-1"></i> Fórmulas
+              </a></li>
+            </ul>
+          </li>
+
+          <li class="nav-item dropdown">
+            <a class="nav-link dropdown-toggle text-white" href="#" data-bs-toggle="dropdown">
+              <i class="fa-solid fa-users me-1"></i> Terceros
+            </a>
+            <ul class="dropdown-menu dropdown-menu-dark">
+              <li><a class="dropdown-item" href="{% url 'lista_clientes' %}">
+                <i class="fa-solid fa-user me-1"></i> Clientes
+              </a></li>
+              <li><a class="dropdown-item" href="{% url 'lista_proveedores' %}">
+                <i class="fa-solid fa-truck-field me-1"></i> Proveedores
+              </a></li>
             </ul>
           </li>
 
