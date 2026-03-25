@@ -62,4 +62,21 @@ urlpatterns = [
     path("formulas/<int:formula_id>/material/nuevo/", views.nuevo_detalle_formula, name="nuevo_detalle_formula"),
     path("formulas/<int:formula_id>/material/<int:detalle_id>/editar/", views.editar_detalle_formula, name="editar_detalle_formula"),
     path("formulas/<int:formula_id>/material/<int:detalle_id>/eliminar/", views.eliminar_detalle_formula, name="eliminar_detalle_formula"),
+    
+    # Producción / Lotes
+    path("produccion/lotes/", views.lista_lotes, name="lista_lotes"),
+    path("produccion/lotes/nuevo/", views.nuevo_lote, name="nuevo_lote"),
+    path("produccion/lotes/<int:lote_id>/", views.detalle_lote, name="detalle_lote"),
+    path("produccion/lotes/<int:lote_id>/consumir/", views.consumir_materiales_lote, name="consumir_materiales_lote"),
+    path("produccion/lotes/<int:lote_id>/finalizar/", views.finalizar_lote, name="finalizar_lote"),
+    
+    # Finanzas: Por cobrar / Por pagar + Pagos
+    path("finanzas/por-cobrar/", views.lista_por_cobrar, name="lista_por_cobrar"),
+    path("finanzas/por-cobrar/<int:cxc_id>/cobrar/", views.cobrar_cxc, name="cobrar_cxc"),
+
+    path("finanzas/por-pagar/compras/", views.lista_por_pagar_compras, name="lista_por_pagar_compras"),
+    path("finanzas/por-pagar/compras/<int:cxp_id>/pagar/", views.pagar_cxp_compra, name="pagar_cxp_compra"),
+
+    path("finanzas/por-pagar/gastos/", views.lista_por_pagar_gastos, name="lista_por_pagar_gastos"),
+    path("finanzas/por-pagar/gastos/<int:cxp_id>/pagar/", views.pagar_cxp_gasto, name="pagar_cxp_gasto"),
     ]

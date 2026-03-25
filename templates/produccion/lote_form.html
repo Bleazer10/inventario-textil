@@ -1,0 +1,65 @@
+{% extends "base.html" %}
+{% block titulo %}Nuevo lote{% endblock %}
+
+{% block content %}
+<div class="mb-3">
+  <h2 class="fw-black mb-0">Nuevo lote</h2>
+  <div class="text-white-50">Selecciona una fórmula y la cantidad a producir</div>
+</div>
+
+<div class="row justify-content-center">
+  <div class="col-12 col-lg-7">
+    <div class="card card-bemore">
+      <div class="card-header text-center">Formulario</div>
+      <div class="card-body">
+        <form method="post" novalidate>
+          {% csrf_token %}
+
+          <div class="mb-3">
+            <label class="form-label">Fórmula</label>
+            {{ form.formula }}
+          </div>
+
+          <div class="mb-3">
+            <label class="form-label">Fecha</label>
+            {{ form.fecha }}
+          </div>
+
+          <div class="mb-3">
+            <label class="form-label">Cantidad producida</label>
+            {{ form.cantidad_producida }}
+          </div>
+
+          <div class="row g-2">
+            <div class="col-md-6">
+              <label class="form-label">Mano de obra (real)</label>
+              {{ form.costo_mano_obra_real }}
+            </div>
+            <div class="col-md-6">
+              <label class="form-label">Indirectos (real)</label>
+              {{ form.costo_indirecto_real }}
+            </div>
+          </div>
+
+          <div class="mt-2 mb-3">
+            <label class="form-label">Notas</label>
+            {{ form.notas }}
+          </div>
+
+          <button class="btn btn-bemore w-100 fw-bold" type="submit">
+            <i class="fa-solid fa-floppy-disk me-2"></i> Guardar lote
+          </button>
+
+          <a class="btn btn-outline-light w-100 mt-2" href="{% url 'lista_lotes' %}">Volver</a>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  const addFC = (id) => { const el = document.getElementById(id); if(el) el.classList.add("form-control"); }
+  addFC("id_formula"); addFC("id_fecha"); addFC("id_cantidad_producida"); addFC("id_costo_mano_obra_real"); addFC("id_costo_indirecto_real"); addFC("id_notas");
+  const notas = document.getElementById("id_notas"); if(notas) notas.setAttribute("rows","3");
+</script>
+{% endblock %}

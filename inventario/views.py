@@ -19,7 +19,7 @@ from .forms import (
     MaterialForm,
     AlmacenForm,
     ItemInventarioForm,
-    AjusteInventarioForm, ClienteForm, ProveedorForm, DetalleFormulaForm, FormulaForm
+    AjusteInventarioForm, ClienteForm, ProveedorForm, DetalleFormulaForm, FormulaForm, LoteProduccionForm
 )
 
 from .models import (
@@ -38,14 +38,14 @@ from .models import (
     # Finanzas
     CuentaPorCobrar,
     CuentaPorPagarCompra,
-    CuentaPorPagarGasto,
+    CuentaPorPagarGasto, Pago,
 
     # Inventario
     CategoriaMaterial,
     Material,
     Almacen,
     ItemInventario,
-    MovimientoInventario, Compra, DetalleCompra, Proveedor, Formula, DetalleFormula
+    MovimientoInventario, Compra, DetalleCompra, Proveedor, Formula, DetalleFormula, LoteProduccion
 )
 
 def obtener_almacen_principal():
@@ -213,13 +213,13 @@ def nueva_venta(request):
 
         for it in items:
             variante_id = it.get("variante_id")
-            cantidad = Decimal(str(it.get("cantidad", "0")))
+            cantidad = Decimal(str(it.get("cantidad", "0")).replace(",", "."))
 
             if not variante_id or cantidad <= 0:
                 continue
 
             variante = get_object_or_404(VarianteProducto, id=variante_id)
-            precio_unitario = Decimal(str(variante.precio_venta_efectivo))
+            precio_unitario = Decimal(str(variante.precio_venta_efectivo)).quantize(Decimal("0.01"))
             subtotal = (precio_unitario * cantidad).quantize(Decimal("0.01"))
 
             total += subtotal
@@ -264,11 +264,9 @@ def nueva_venta(request):
         almacen_principal = obtener_almacen_principal()
 
         for variante, cantidad, precio_unitario, subtotal in detalles_a_crear:
-            # Solo descuenta si el producto controla inventario
             if not variante.producto.controla_inventario:
                 continue
 
-            # Crear o buscar ItemInventario del producto terminado en el almacén Principal
             item, _ = ItemInventario.objects.get_or_create(
                 almacen=almacen_principal,
                 tipo=ItemInventario.TipoItem.PRODUCTO,
@@ -276,7 +274,6 @@ def nueva_venta(request):
                 defaults={"punto_reorden": 0, "activo": True},
             )
 
-            # Registrar salida por venta
             MovimientoInventario.objects.create(
                 item=item,
                 tipo=MovimientoInventario.TipoMovimiento.SALIDA,
@@ -285,6 +282,17 @@ def nueva_venta(request):
                 referencia="VENTA",
                 referencia_id=venta.id,
                 nota="Salida automática por venta",
+            )
+
+        # ✅ SI ES CRÉDITO → CREAR CUENTA POR COBRAR
+        if tipo_pago == "CREDITO":
+            CuentaPorCobrar.objects.create(
+                cliente=cliente,
+                venta=venta,
+                monto_total=total,
+                monto_pagado=Decimal("0.00"),
+                saldo=total,
+                estado=CuentaPorCobrar.Estado.ABIERTA,
             )
 
         messages.success(request, f"Venta #{venta.id} guardada correctamente. Total: ${total}")
@@ -311,7 +319,7 @@ def nuevo_gasto(request):
             return redirect("nuevo_gasto")
 
         try:
-            monto_dec = Decimal(monto).quantize(Decimal("0.01"))
+            monto_dec = Decimal(monto.replace(",", ".")).quantize(Decimal("0.01"))
         except:
             messages.error(request, "Monto inválido.")
             return redirect("nuevo_gasto")
@@ -330,6 +338,17 @@ def nuevo_gasto(request):
             descripcion=descripcion,
         )
 
+        # ✅ SI QUEDA PENDIENTE O PARCIAL → CREAR CUENTA POR PAGAR (GASTO)
+        if gasto.estado_pago in [Gasto.EstadoPago.PENDIENTE, Gasto.EstadoPago.PARCIAL]:
+            CuentaPorPagarGasto.objects.create(
+                gasto=gasto,
+                proveedor=gasto.proveedor,  # puede ser None
+                monto_total=gasto.monto,
+                monto_pagado=Decimal("0.00"),
+                saldo=gasto.monto,
+                estado=CuentaPorPagarGasto.Estado.ABIERTA,
+            )
+
         messages.success(request, f"Gasto #{gasto.id} guardado correctamente.")
         return redirect("dashboard")
 
@@ -345,18 +364,15 @@ def movimientos(request):
         fecha_inicio = hoy
         fecha_fin = hoy
     elif filtro == "semana":
-        # lunes a domingo
-        fecha_inicio = hoy - timedelta(days=hoy.weekday())
+        fecha_inicio = hoy - timedelta(days=hoy.weekday())  # lunes
         fecha_fin = fecha_inicio + timedelta(days=6)
     elif filtro == "mes":
         fecha_inicio = hoy.replace(day=1)
-        # fin de mes
         if fecha_inicio.month == 12:
             fecha_fin = fecha_inicio.replace(year=fecha_inicio.year + 1, month=1, day=1) - timedelta(days=1)
         else:
             fecha_fin = fecha_inicio.replace(month=fecha_inicio.month + 1, day=1) - timedelta(days=1)
     else:
-        # rango personalizado
         fi = request.GET.get("fi")
         ff = request.GET.get("ff")
         try:
@@ -371,33 +387,77 @@ def movimientos(request):
         fecha__gte=fecha_inicio,
         fecha__lte=fecha_fin,
         estado=Venta.Estado.CONFIRMADA,
-    )
-    ventas_total = ventas_qs.aggregate(s=Sum("total"))["s"] or Decimal("0.00")
+    ).select_related("cliente").order_by("-fecha", "-id")
 
-    # Gastos en rango (todos)
+    ventas_total = (
+        ventas_qs.aggregate(s=Coalesce(Sum("total"), Decimal("0.00")))["s"]
+    ).quantize(Decimal("0.01"))
+
+    # Gastos en rango
     gastos_qs = Gasto.objects.filter(
         fecha__gte=fecha_inicio,
         fecha__lte=fecha_fin,
-    )
-    gastos_total = gastos_qs.aggregate(s=Sum("monto"))["s"] or Decimal("0.00")
+    ).select_related("categoria", "proveedor").order_by("-fecha", "-id")
+
+    gastos_total = (
+        gastos_qs.aggregate(s=Coalesce(Sum("monto"), Decimal("0.00")))["s"]
+    ).quantize(Decimal("0.01"))
 
     balance = (ventas_total - gastos_total).quantize(Decimal("0.01"))
 
-    # Por cobrar / Por pagar (saldo)
-    por_cobrar_total = (CuentaPorCobrar.objects.filter(estado=CuentaPorCobrar.Estado.ABIERTA)
-                        .aggregate(s=Sum("saldo"))["s"] or Decimal("0.00"))
+    # Totales por cobrar / por pagar (saldo)
+    por_cobrar_total = (
+        CuentaPorCobrar.objects
+        .filter(estado=CuentaPorCobrar.Estado.ABIERTA)
+        .aggregate(s=Coalesce(Sum("saldo"), Decimal("0.00")))["s"]
+    ).quantize(Decimal("0.01"))
 
-    por_pagar_compras_total = (CuentaPorPagarCompra.objects.filter(estado=CuentaPorPagarCompra.Estado.ABIERTA)
-                              .aggregate(s=Sum("saldo"))["s"] or Decimal("0.00"))
+    por_pagar_compras_total = (
+        CuentaPorPagarCompra.objects
+        .filter(estado=CuentaPorPagarCompra.Estado.ABIERTA)
+        .aggregate(s=Coalesce(Sum("saldo"), Decimal("0.00")))["s"]
+    ).quantize(Decimal("0.01"))
 
-    por_pagar_gastos_total = (CuentaPorPagarGasto.objects.filter(estado=CuentaPorPagarGasto.Estado.ABIERTA)
-                             .aggregate(s=Sum("saldo"))["s"] or Decimal("0.00"))
+    por_pagar_gastos_total = (
+        CuentaPorPagarGasto.objects
+        .filter(estado=CuentaPorPagarGasto.Estado.ABIERTA)
+        .aggregate(s=Coalesce(Sum("saldo"), Decimal("0.00")))["s"]
+    ).quantize(Decimal("0.01"))
 
     por_pagar_total = (por_pagar_compras_total + por_pagar_gastos_total).quantize(Decimal("0.01"))
 
     # Listas para pestañas (últimos registros del rango)
-    ventas_lista = ventas_qs.order_by("-fecha", "-id")[:20]
-    gastos_lista = gastos_qs.order_by("-fecha", "-id")[:20]
+    ventas_lista = ventas_qs[:20]
+    gastos_lista = gastos_qs[:20]
+
+    # ✅ NUEVO: listas para pestañas de CxC / CxP (las dejamos por estado ABIERTA)
+    cxc_lista = (
+        CuentaPorCobrar.objects
+        .filter(estado=CuentaPorCobrar.Estado.ABIERTA)
+        .select_related("cliente", "venta")
+        .order_by("-creada")[:20]
+    )
+
+    cxp_compras_lista = (
+        CuentaPorPagarCompra.objects
+        .filter(estado=CuentaPorPagarCompra.Estado.ABIERTA)
+        .select_related("proveedor", "compra")
+        .order_by("-creada")[:20]
+    )
+
+    cxp_gastos_lista = (
+        CuentaPorPagarGasto.objects
+        .filter(estado=CuentaPorPagarGasto.Estado.ABIERTA)
+        .select_related("proveedor", "gasto")
+        .order_by("-creada")[:20]
+    )
+
+    # ✅ OPCIONAL: pagos en rango (si quieres pestaña Pagos)
+    pagos_lista = (
+        Pago.objects
+        .filter(fecha__gte=fecha_inicio, fecha__lte=fecha_fin)
+        .order_by("-fecha", "-id")[:30]
+    )
 
     return render(request, "movimientos/movimientos.html", {
         "filtro": filtro,
@@ -413,6 +473,12 @@ def movimientos(request):
 
         "ventas_lista": ventas_lista,
         "gastos_lista": gastos_lista,
+
+        "cxc_lista": cxc_lista,
+        "cxp_compras_lista": cxp_compras_lista,
+        "cxp_gastos_lista": cxp_gastos_lista,
+
+        "pagos_lista": pagos_lista,
     })
 
 @login_required
@@ -932,6 +998,24 @@ def recibir_compra(request, compra_id):
     compra.estado = Compra.Estado.RECIBIDA
     compra.save(update_fields=["estado"])
 
+    # ✅ CREAR / ACTUALIZAR CUENTA POR PAGAR DE COMPRA (si queda pendiente o parcial)
+    total = Decimal("0.00")
+    for d in detalles:
+        total += (d.cantidad * d.costo_unitario)
+    total = total.quantize(Decimal("0.01"))
+
+    if compra.estado_pago in [Compra.EstadoPago.PENDIENTE, Compra.EstadoPago.PARCIAL]:
+        CuentaPorPagarCompra.objects.update_or_create(
+            compra=compra,
+            defaults={
+                "proveedor": compra.proveedor,
+                "monto_total": total,
+                "monto_pagado": Decimal("0.00"),
+                "saldo": total,
+                "estado": CuentaPorPagarCompra.Estado.ABIERTA,
+            }
+        )
+
     messages.success(request, f"Compra #{compra.id} recibida. Inventario actualizado.")
     return redirect("detalle_compra", compra_id=compra.id)
 
@@ -1188,3 +1272,473 @@ def eliminar_detalle_formula(request, formula_id, detalle_id):
     detalle.delete()
     messages.success(request, "Material eliminado de la fórmula.")
     return redirect("detalle_formula", formula_id=formula.id)
+
+def _consumo_material_por_unidad(detalle: DetalleFormula) -> Decimal:
+    """
+    Devuelve el consumo REAL por unidad incluyendo merma:
+    consumo_real = cantidad_por_unidad * (1 + merma/100)
+    """
+    merma = (detalle.merma_porcentaje or Decimal("0.00"))
+    factor = Decimal("1.00") + (merma / Decimal("100.00"))
+    return (detalle.cantidad_por_unidad * factor)
+
+
+def _calcular_costos_lote(lote: LoteProduccion) -> dict:
+    """
+    Calcula:
+    - consumo total por material (según fórmula y cantidad_producida)
+    - costo total materiales (usa Material.costo_defecto)
+    - costo total lote (materiales + mano_obra_real + indirecto_real)
+    - costo unitario resultante
+    """
+    detalles = lote.formula.detalles.select_related("material").all()
+    cantidad = lote.cantidad_producida or Decimal("0.00")
+
+    filas = []
+    costo_materiales = Decimal("0.00")
+    alertas = []
+
+    for d in detalles:
+        consumo_u = _consumo_material_por_unidad(d)  # por unidad
+        consumo_total = (consumo_u * cantidad).quantize(Decimal("0.0001"))
+
+        costo_mat = d.material.costo_defecto or Decimal("0.00")
+        if costo_mat <= 0:
+            alertas.append(f"Material sin costo_defecto: {d.material.nombre}")
+
+        costo_total_mat = (consumo_total * costo_mat).quantize(Decimal("0.01"))
+        costo_materiales += costo_total_mat
+
+        filas.append({
+            "material": d.material,
+            "cantidad_por_unidad": d.cantidad_por_unidad,
+            "merma_porcentaje": d.merma_porcentaje,
+            "consumo_por_unidad_real": consumo_u.quantize(Decimal("0.0001")),
+            "consumo_total": consumo_total,
+            "costo_unitario_material": costo_mat.quantize(Decimal("0.01")),
+            "costo_total_material": costo_total_mat,
+        })
+
+    costo_materiales = costo_materiales.quantize(Decimal("0.01"))
+    mano_obra = (lote.costo_mano_obra_real or Decimal("0.00")).quantize(Decimal("0.01"))
+    indirecto = (lote.costo_indirecto_real or Decimal("0.00")).quantize(Decimal("0.01"))
+    costo_total_lote = (costo_materiales + mano_obra + indirecto).quantize(Decimal("0.01"))
+
+    if cantidad and cantidad > 0:
+        costo_unitario = (costo_total_lote / cantidad).quantize(Decimal("0.01"))
+    else:
+        costo_unitario = Decimal("0.00")
+
+    return {
+        "filas": filas,
+        "costo_materiales": costo_materiales,
+        "mano_obra": mano_obra,
+        "indirecto": indirecto,
+        "costo_total_lote": costo_total_lote,
+        "costo_unitario": costo_unitario,
+        "alertas": alertas,
+    }
+
+
+@login_required
+def lista_lotes(request):
+    q = (request.GET.get("q") or "").strip()
+    estado = (request.GET.get("estado") or "").strip()
+
+    lotes = (
+        LoteProduccion.objects
+        .select_related("formula", "formula__variante_producto", "formula__variante_producto__producto")
+        .order_by("-fecha", "-creado")
+    )
+
+    if estado:
+        lotes = lotes.filter(estado=estado)
+
+    if q:
+        lotes = lotes.filter(
+            Q(formula__nombre__icontains=q) |
+            Q(formula__variante_producto__sku__icontains=q) |
+            Q(formula__variante_producto__nombre__icontains=q) |
+            Q(formula__variante_producto__producto__nombre__icontains=q)
+        )
+
+    return render(request, "produccion/lotes_lista.html", {
+        "lotes": lotes,
+        "q": q,
+        "estado": estado,
+        "estados": LoteProduccion.Estado.choices,
+    })
+
+
+@login_required
+def nuevo_lote(request):
+    if request.method == "POST":
+        form = LoteProduccionForm(request.POST)
+        if form.is_valid():
+            lote = form.save(commit=False)
+            lote.estado = LoteProduccion.Estado.BORRADOR
+            lote.save()
+            messages.success(request, f"Lote #{lote.id} creado en BORRADOR.")
+            return redirect("detalle_lote", lote_id=lote.id)
+        messages.error(request, "Revisa los datos del formulario.")
+    else:
+        form = LoteProduccionForm(initial={"fecha": date.today()})
+
+    return render(request, "produccion/lote_form.html", {"form": form, "modo": "nueva"})
+
+
+@login_required
+def detalle_lote(request, lote_id):
+    lote = get_object_or_404(
+        LoteProduccion.objects.select_related(
+            "formula", "formula__variante_producto", "formula__variante_producto__producto"
+        ),
+        id=lote_id
+    )
+
+    costos = _calcular_costos_lote(lote)
+
+    # Movimientos ya generados por este lote (si existen)
+    movimientos = (
+        MovimientoInventario.objects
+        .select_related("item", "item__material", "item__variante_producto", "item__almacen", "item__variante_producto__producto")
+        .filter(referencia="PRODUCCION", referencia_id=lote.id)
+        .order_by("-creado")
+    )
+
+    return render(request, "produccion/lote_detalle.html", {
+        "lote": lote,
+        "costos": costos,
+        "movimientos": movimientos,
+    })
+
+
+@require_POST
+@login_required
+def consumir_materiales_lote(request, lote_id):
+    lote = get_object_or_404(LoteProduccion, id=lote_id)
+
+    if lote.estado != LoteProduccion.Estado.BORRADOR:
+        messages.error(request, "Solo puedes consumir materiales si el lote está en BORRADOR.")
+        return redirect("detalle_lote", lote_id=lote.id)
+
+    if lote.cantidad_producida <= 0:
+        messages.error(request, "La cantidad producida debe ser mayor a 0.")
+        return redirect("detalle_lote", lote_id=lote.id)
+
+    almacen_principal = obtener_almacen_principal()
+
+    # Calcular consumos
+    costos = _calcular_costos_lote(lote)
+
+    # Crear SALIDAS de materiales
+    for fila in costos["filas"]:
+        material = fila["material"]
+        consumo_total = fila["consumo_total"]
+
+        item, _ = ItemInventario.objects.get_or_create(
+            almacen=almacen_principal,
+            tipo=ItemInventario.TipoItem.MATERIAL,
+            material=material,
+            defaults={"punto_reorden": 0, "activo": True},
+        )
+
+        MovimientoInventario.objects.create(
+            item=item,
+            tipo=MovimientoInventario.TipoMovimiento.SALIDA,
+            cantidad=consumo_total,
+            costo_unitario=fila["costo_unitario_material"],  # referencia informativa
+            referencia="PRODUCCION",
+            referencia_id=lote.id,
+            nota=f"Consumo por lote #{lote.id}",
+        )
+
+    lote.estado = LoteProduccion.Estado.CONSUMIDO
+    lote.save(update_fields=["estado"])
+
+    messages.success(request, "Materiales consumidos. Se registraron SALIDAS en inventario.")
+    return redirect("detalle_lote", lote_id=lote.id)
+
+
+@require_POST
+@login_required
+def finalizar_lote(request, lote_id):
+    lote = get_object_or_404(LoteProduccion, id=lote_id)
+
+    if lote.estado != LoteProduccion.Estado.CONSUMIDO:
+        messages.error(request, "Para finalizar, primero debes consumir materiales (estado: Material consumido).")
+        return redirect("detalle_lote", lote_id=lote.id)
+
+    almacen_principal = obtener_almacen_principal()
+    variante = lote.formula.variante_producto
+
+    # Calcular costo unitario resultante (estimado)
+    costos = _calcular_costos_lote(lote)
+    costo_unitario = costos["costo_unitario"]
+
+    # Crear ENTRADA de producto terminado
+    item_producto, _ = ItemInventario.objects.get_or_create(
+        almacen=almacen_principal,
+        tipo=ItemInventario.TipoItem.PRODUCTO,
+        variante_producto=variante,
+        defaults={"punto_reorden": 0, "activo": True},
+    )
+
+    MovimientoInventario.objects.create(
+        item=item_producto,
+        tipo=MovimientoInventario.TipoMovimiento.ENTRADA,
+        cantidad=lote.cantidad_producida,
+        costo_unitario=costo_unitario,
+        referencia="PRODUCCION",
+        referencia_id=lote.id,
+        nota=f"Entrada producto terminado por lote #{lote.id}",
+    )
+
+    lote.costo_unitario_resultado = costo_unitario
+    lote.estado = LoteProduccion.Estado.FINALIZADO
+    lote.save(update_fields=["costo_unitario_resultado", "estado"])
+
+    messages.success(request, "Lote finalizado. Se registró la ENTRADA del producto terminado.")
+    return redirect("detalle_lote", lote_id=lote.id)
+
+# -------------------------
+# Helpers pagos
+# -------------------------
+def _registrar_pago_entrada(cxc: CuentaPorCobrar, monto: Decimal, metodo: str, fecha_pago, nota: str):
+    # Crea pago (entrada)
+    Pago.objects.create(
+        direccion=Pago.Direccion.ENTRADA,
+        metodo=metodo or None,
+        fecha=fecha_pago,
+        monto=monto,
+        cuenta_por_cobrar=cxc,
+        nota=nota or None,
+    )
+
+    # Actualiza montos
+    cxc.monto_pagado = (cxc.monto_pagado + monto).quantize(Decimal("0.01"))
+    cxc.saldo = (cxc.monto_total - cxc.monto_pagado).quantize(Decimal("0.01"))
+    if cxc.saldo <= 0:
+        cxc.saldo = Decimal("0.00")
+        cxc.estado = CuentaPorCobrar.Estado.CERRADA
+    cxc.save(update_fields=["monto_pagado", "saldo", "estado"])
+
+
+def _registrar_pago_salida_compra(cxp: CuentaPorPagarCompra, monto: Decimal, metodo: str, fecha_pago, nota: str):
+    Pago.objects.create(
+        direccion=Pago.Direccion.SALIDA,
+        metodo=metodo or None,
+        fecha=fecha_pago,
+        monto=monto,
+        cuenta_por_pagar_compra=cxp,
+        nota=nota or None,
+    )
+    cxp.monto_pagado = (cxp.monto_pagado + monto).quantize(Decimal("0.01"))
+    cxp.saldo = (cxp.monto_total - cxp.monto_pagado).quantize(Decimal("0.01"))
+    if cxp.saldo <= 0:
+        cxp.saldo = Decimal("0.00")
+        cxp.estado = CuentaPorPagarCompra.Estado.CERRADA
+    cxp.save(update_fields=["monto_pagado", "saldo", "estado"])
+
+
+def _registrar_pago_salida_gasto(cxp: CuentaPorPagarGasto, monto: Decimal, metodo: str, fecha_pago, nota: str):
+    Pago.objects.create(
+        direccion=Pago.Direccion.SALIDA,
+        metodo=metodo or None,
+        fecha=fecha_pago,
+        monto=monto,
+        cuenta_por_pagar_gasto=cxp,
+        nota=nota or None,
+    )
+    cxp.monto_pagado = (cxp.monto_pagado + monto).quantize(Decimal("0.01"))
+    cxp.saldo = (cxp.monto_total - cxp.monto_pagado).quantize(Decimal("0.01"))
+    if cxp.saldo <= 0:
+        cxp.saldo = Decimal("0.00")
+        cxp.estado = CuentaPorPagarGasto.Estado.CERRADA
+    cxp.save(update_fields=["monto_pagado", "saldo", "estado"])
+
+
+# -------------------------
+# POR COBRAR
+# -------------------------
+@login_required
+def lista_por_cobrar(request):
+    q = (request.GET.get("q") or "").strip()
+    estado = (request.GET.get("estado") or "").strip()  # ABIERTA/CERRADA/VENCIDA
+
+    qs = (
+        CuentaPorCobrar.objects
+        .select_related("cliente", "venta")
+        .order_by("-creada")
+    )
+
+    if estado:
+        qs = qs.filter(estado=estado)
+
+    if q:
+        qs = qs.filter(
+            Q(cliente__nombre__icontains=q) |
+            Q(venta__id__icontains=q)
+        )
+
+    return render(request, "finanzas/por_cobrar_lista.html", {
+        "cuentas": qs,
+        "q": q,
+        "estado": estado,
+        "estados": CuentaPorCobrar.Estado.choices,
+    })
+
+
+@login_required
+def cobrar_cxc(request, cxc_id):
+    cxc = get_object_or_404(CuentaPorCobrar.objects.select_related("cliente", "venta"), id=cxc_id)
+
+    if request.method == "POST":
+        fecha_pago = request.POST.get("fecha") or str(date.today())
+        metodo = request.POST.get("metodo", "").strip()
+        nota = request.POST.get("nota", "").strip()
+        monto_raw = (request.POST.get("monto") or "0").strip().replace(",", ".")
+
+        try:
+            monto = Decimal(monto_raw).quantize(Decimal("0.01"))
+        except:
+            messages.error(request, "Monto inválido.")
+            return redirect("cobrar_cxc", cxc_id=cxc.id)
+
+        if monto <= 0:
+            messages.error(request, "El monto debe ser mayor a 0.")
+            return redirect("cobrar_cxc", cxc_id=cxc.id)
+
+        if monto > cxc.saldo:
+            messages.error(request, "El monto no puede ser mayor que el saldo.")
+            return redirect("cobrar_cxc", cxc_id=cxc.id)
+
+        _registrar_pago_entrada(cxc, monto, metodo, fecha_pago, nota)
+        messages.success(request, "Cobro registrado correctamente.")
+        return redirect("lista_por_cobrar")
+
+    return render(request, "finanzas/cobrar_form.html", {"cxc": cxc})
+
+
+# -------------------------
+# POR PAGAR COMPRAS
+# -------------------------
+@login_required
+def lista_por_pagar_compras(request):
+    q = (request.GET.get("q") or "").strip()
+    estado = (request.GET.get("estado") or "").strip()
+
+    qs = (
+        CuentaPorPagarCompra.objects
+        .select_related("proveedor", "compra")
+        .order_by("-creada")
+    )
+
+    if estado:
+        qs = qs.filter(estado=estado)
+
+    if q:
+        qs = qs.filter(
+            Q(proveedor__nombre__icontains=q) |
+            Q(compra__id__icontains=q)
+        )
+
+    return render(request, "finanzas/por_pagar_compras_lista.html", {
+        "cuentas": qs,
+        "q": q,
+        "estado": estado,
+        "estados": CuentaPorPagarCompra.Estado.choices,
+    })
+
+
+@login_required
+def pagar_cxp_compra(request, cxp_id):
+    cxp = get_object_or_404(CuentaPorPagarCompra.objects.select_related("proveedor", "compra"), id=cxp_id)
+
+    if request.method == "POST":
+        fecha_pago = request.POST.get("fecha") or str(date.today())
+        metodo = request.POST.get("metodo", "").strip()
+        nota = request.POST.get("nota", "").strip()
+        monto_raw = (request.POST.get("monto") or "0").strip().replace(",", ".")
+
+        try:
+            monto = Decimal(monto_raw).quantize(Decimal("0.01"))
+        except:
+            messages.error(request, "Monto inválido.")
+            return redirect("pagar_cxp_compra", cxp_id=cxp.id)
+
+        if monto <= 0:
+            messages.error(request, "El monto debe ser mayor a 0.")
+            return redirect("pagar_cxp_compra", cxp_id=cxp.id)
+
+        if monto > cxp.saldo:
+            messages.error(request, "El monto no puede ser mayor que el saldo.")
+            return redirect("pagar_cxp_compra", cxp_id=cxp.id)
+
+        _registrar_pago_salida_compra(cxp, monto, metodo, fecha_pago, nota)
+        messages.success(request, "Pago registrado correctamente.")
+        return redirect("lista_por_pagar_compras")
+
+    return render(request, "finanzas/pagar_compra_form.html", {"cxp": cxp})
+
+
+# -------------------------
+# POR PAGAR GASTOS
+# -------------------------
+@login_required
+def lista_por_pagar_gastos(request):
+    q = (request.GET.get("q") or "").strip()
+    estado = (request.GET.get("estado") or "").strip()
+
+    qs = (
+        CuentaPorPagarGasto.objects
+        .select_related("proveedor", "gasto")
+        .order_by("-creada")
+    )
+
+    if estado:
+        qs = qs.filter(estado=estado)
+
+    if q:
+        qs = qs.filter(
+            Q(proveedor__nombre__icontains=q) |
+            Q(gasto__id__icontains=q)
+        )
+
+    return render(request, "finanzas/por_pagar_gastos_lista.html", {
+        "cuentas": qs,
+        "q": q,
+        "estado": estado,
+        "estados": CuentaPorPagarGasto.Estado.choices,
+    })
+
+
+@login_required
+def pagar_cxp_gasto(request, cxp_id):
+    cxp = get_object_or_404(CuentaPorPagarGasto.objects.select_related("proveedor", "gasto"), id=cxp_id)
+
+    if request.method == "POST":
+        fecha_pago = request.POST.get("fecha") or str(date.today())
+        metodo = request.POST.get("metodo", "").strip()
+        nota = request.POST.get("nota", "").strip()
+        monto_raw = (request.POST.get("monto") or "0").strip().replace(",", ".")
+
+        try:
+            monto = Decimal(monto_raw).quantize(Decimal("0.01"))
+        except:
+            messages.error(request, "Monto inválido.")
+            return redirect("pagar_cxp_gasto", cxp_id=cxp.id)
+
+        if monto <= 0:
+            messages.error(request, "El monto debe ser mayor a 0.")
+            return redirect("pagar_cxp_gasto", cxp_id=cxp.id)
+
+        if monto > cxp.saldo:
+            messages.error(request, "El monto no puede ser mayor que el saldo.")
+            return redirect("pagar_cxp_gasto", cxp_id=cxp.id)
+
+        _registrar_pago_salida_gasto(cxp, monto, metodo, fecha_pago, nota)
+        messages.success(request, "Pago registrado correctamente.")
+        return redirect("lista_por_pagar_gastos")
+
+    return render(request, "finanzas/pagar_gasto_form.html", {"cxp": cxp})

@@ -91,9 +91,26 @@
           Egresos (Gastos)
         </button>
       </li>
+      <li class="nav-item" role="presentation">
+        <button class="nav-link" data-bs-toggle="tab" data-bs-target="#porcobrar" type="button">
+          Por cobrar
+        </button>
+      </li>
+      <li class="nav-item" role="presentation">
+        <button class="nav-link" data-bs-toggle="tab" data-bs-target="#porpagar" type="button">
+          Por pagar
+        </button>
+      </li>
+      <li class="nav-item" role="presentation">
+        <button class="nav-link" data-bs-toggle="tab" data-bs-target="#pagos" type="button">
+          Pagos
+        </button>
+      </li>
     </ul>
 
     <div class="tab-content">
+
+      <!-- INGRESOS -->
       <div class="tab-pane fade show active" id="ingresos">
         <div class="table-responsive">
           <table class="table table-bemore align-middle">
@@ -123,6 +140,7 @@
         </div>
       </div>
 
+      <!-- EGRESOS -->
       <div class="tab-pane fade" id="egresos">
         <div class="table-responsive">
           <table class="table table-bemore align-middle">
@@ -151,6 +169,143 @@
           </table>
         </div>
       </div>
+
+      <!-- POR COBRAR -->
+      <div class="tab-pane fade" id="porcobrar">
+        <div class="d-flex justify-content-end mb-2">
+          <a class="btn btn-sm btn-outline-light fw-bold" href="{% url 'lista_por_cobrar' %}">
+            Ver todo
+          </a>
+        </div>
+        <div class="table-responsive">
+          <table class="table table-bemore align-middle">
+            <thead>
+              <tr>
+                <th>Cuenta</th>
+                <th>Cliente</th>
+                <th>Venta</th>
+                <th class="text-end">Saldo</th>
+                <th class="text-end"></th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for c in cxc_lista %}
+                <tr>
+                  <td class="fw-bold">#{{ c.id }}</td>
+                  <td class="text-white-50">{{ c.cliente.nombre|default:"General" }}</td>
+                  <td class="text-white-50">{% if c.venta %}#{{ c.venta.id }}{% else %}-{% endif %}</td>
+                  <td class="text-end fw-black">${{ c.saldo }}</td>
+                  <td class="text-end">
+                    <a class="btn btn-sm btn-outline-light" href="{% url 'cobrar_cxc' c.id %}">Cobrar</a>
+                  </td>
+                </tr>
+              {% empty %}
+                <tr><td colspan="5" class="text-white-50">No hay cuentas por cobrar abiertas.</td></tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- POR PAGAR -->
+      <div class="tab-pane fade" id="porpagar">
+        <div class="row g-3">
+          <div class="col-12 col-lg-6">
+            <div class="d-flex justify-content-between align-items-center mb-2">
+              <div class="fw-bold">Compras</div>
+              <a class="btn btn-sm btn-outline-light fw-bold" href="{% url 'lista_por_pagar_compras' %}">Ver todo</a>
+            </div>
+            <div class="table-responsive">
+              <table class="table table-bemore align-middle">
+                <thead>
+                  <tr>
+                    <th>Cuenta</th>
+                    <th>Proveedor</th>
+                    <th class="text-end">Saldo</th>
+                    <th class="text-end"></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {% for c in cxp_compras_lista %}
+                    <tr>
+                      <td class="fw-bold">#{{ c.id }}</td>
+                      <td class="text-white-50">{{ c.proveedor.nombre|default:"-" }}</td>
+                      <td class="text-end fw-black">${{ c.saldo }}</td>
+                      <td class="text-end">
+                        <a class="btn btn-sm btn-outline-light" href="{% url 'pagar_cxp_compra' c.id %}">Pagar</a>
+                      </td>
+                    </tr>
+                  {% empty %}
+                    <tr><td colspan="4" class="text-white-50">No hay cuentas por pagar (compras) abiertas.</td></tr>
+                  {% endfor %}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <div class="col-12 col-lg-6">
+            <div class="d-flex justify-content-between align-items-center mb-2">
+              <div class="fw-bold">Gastos</div>
+              <a class="btn btn-sm btn-outline-light fw-bold" href="{% url 'lista_por_pagar_gastos' %}">Ver todo</a>
+            </div>
+            <div class="table-responsive">
+              <table class="table table-bemore align-middle">
+                <thead>
+                  <tr>
+                    <th>Cuenta</th>
+                    <th>Proveedor</th>
+                    <th class="text-end">Saldo</th>
+                    <th class="text-end"></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {% for c in cxp_gastos_lista %}
+                    <tr>
+                      <td class="fw-bold">#{{ c.id }}</td>
+                      <td class="text-white-50">{{ c.proveedor.nombre|default:"-" }}</td>
+                      <td class="text-end fw-black">${{ c.saldo }}</td>
+                      <td class="text-end">
+                        <a class="btn btn-sm btn-outline-light" href="{% url 'pagar_cxp_gasto' c.id %}">Pagar</a>
+                      </td>
+                    </tr>
+                  {% empty %}
+                    <tr><td colspan="4" class="text-white-50">No hay cuentas por pagar (gastos) abiertas.</td></tr>
+                  {% endfor %}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- PAGOS -->
+      <div class="tab-pane fade" id="pagos">
+        <div class="table-responsive">
+          <table class="table table-bemore align-middle">
+            <thead>
+              <tr>
+                <th>Fecha</th>
+                <th>Dirección</th>
+                <th>Método</th>
+                <th class="text-end">Monto</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for p in pagos_lista %}
+                <tr>
+                  <td class="text-white-50">{{ p.fecha }}</td>
+                  <td>{{ p.get_direccion_display }}</td>
+                  <td class="text-white-50">{{ p.metodo|default:"-" }}</td>
+                  <td class="text-end fw-black">${{ p.monto }}</td>
+                </tr>
+              {% empty %}
+                <tr><td colspan="4" class="text-white-50">No hay pagos en este rango.</td></tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
     </div>
 
   </div>

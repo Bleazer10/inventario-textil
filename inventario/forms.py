@@ -1,5 +1,5 @@
 from django import forms
-from .models import CategoriaProducto, Producto, VarianteProducto, CategoriaMaterial, Material, Almacen, ItemInventario, Cliente, Proveedor, DetalleFormula, Formula
+from .models import CategoriaProducto, Producto, VarianteProducto, CategoriaMaterial, Material, Almacen, ItemInventario, Cliente, Proveedor, DetalleFormula, Formula, LoteProduccion
 
 class ProductoForm(forms.ModelForm):
     class Meta:
@@ -109,4 +109,16 @@ class DetalleFormulaForm(forms.ModelForm):
             "material",
             "cantidad_por_unidad",
             "merma_porcentaje",
+        ]
+
+class LoteProduccionForm(forms.ModelForm):
+    class Meta:
+        model = LoteProduccion
+        fields = [
+            "formula",
+            "fecha",
+            "cantidad_producida",
+            "costo_mano_obra_real",
+            "costo_indirecto_real",
+            "notas",
         ]

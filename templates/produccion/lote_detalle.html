@@ -1,0 +1,159 @@
+{% extends "base.html" %}
+{% block titulo %}Lote #{{ lote.id }}{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <div>
+    <h2 class="fw-black mb-0">Lote #{{ lote.id }}</h2>
+    <div class="text-white-50">
+      {{ lote.formula.variante_producto.producto.nombre }} • {{ lote.formula.variante_producto.nombre }}
+      (SKU: {{ lote.formula.variante_producto.sku }}) • Estado: {{ lote.get_estado_display }}
+    </div>
+  </div>
+
+  <div class="d-flex gap-2">
+    <a class="btn btn-outline-light fw-bold" href="{% url 'lista_lotes' %}">Volver</a>
+
+    {% if lote.estado == "BORRADOR" %}
+      <form method="post" action="{% url 'consumir_materiales_lote' lote.id %}" class="m-0">
+        {% csrf_token %}
+        <button class="btn btn-bemore fw-bold" type="submit" onclick="return confirm('¿Consumir materiales de este lote?')">
+          <i class="fa-solid fa-arrow-down me-2"></i> Consumir materiales
+        </button>
+      </form>
+    {% endif %}
+
+    {% if lote.estado == "CONSUMIDO" %}
+      <form method="post" action="{% url 'finalizar_lote' lote.id %}" class="m-0">
+        {% csrf_token %}
+        <button class="btn btn-bemore fw-bold" type="submit" onclick="return confirm('¿Finalizar lote y crear producto terminado?')">
+          <i class="fa-solid fa-check me-2"></i> Finalizar lote
+        </button>
+      </form>
+    {% endif %}
+  </div>
+</div>
+
+{% if costos.alertas %}
+  <div class="alert alert-warning">
+    <div class="fw-bold mb-1">Avisos</div>
+    <ul class="mb-0">
+      {% for a in costos.alertas %}
+        <li>{{ a }}</li>
+      {% endfor %}
+    </ul>
+  </div>
+{% endif %}
+
+<div class="row g-3">
+  <div class="col-lg-5">
+    <div class="card card-bemore">
+      <div class="card-header">Costos del lote</div>
+      <div class="card-body">
+        <div class="d-flex justify-content-between">
+          <div class="text-white-50">Cantidad producida</div>
+          <div class="fw-black">{{ lote.cantidad_producida }}</div>
+        </div>
+        <hr class="border-light opacity-25">
+        <div class="d-flex justify-content-between">
+          <div class="text-white-50">Materiales</div>
+          <div class="fw-black">${{ costos.costo_materiales }}</div>
+        </div>
+        <div class="d-flex justify-content-between">
+          <div class="text-white-50">Mano de obra</div>
+          <div class="fw-black">${{ costos.mano_obra }}</div>
+        </div>
+        <div class="d-flex justify-content-between">
+          <div class="text-white-50">Indirectos</div>
+          <div class="fw-black">${{ costos.indirecto }}</div>
+        </div>
+        <hr class="border-light opacity-25">
+        <div class="d-flex justify-content-between">
+          <div class="text-white-50 fw-bold">Total lote</div>
+          <div class="fw-black fs-4">${{ costos.costo_total_lote }}</div>
+        </div>
+        <div class="d-flex justify-content-between mt-2">
+          <div class="text-white-50 fw-bold">Costo unitario estimado</div>
+          <div class="fw-black fs-4">${{ costos.costo_unitario }}</div>
+        </div>
+        <div class="text-white-50 small mt-2">
+          * Por ahora usa <code>Material.costo_defecto</code>.
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-lg-7">
+    <div class="card card-bemore">
+      <div class="card-header">Consumo de materiales</div>
+      <div class="card-body">
+        <div class="table-responsive">
+          <table class="table table-bemore align-middle">
+            <thead>
+              <tr>
+                <th>Material</th>
+                <th class="text-end">Por unidad</th>
+                <th class="text-end">Merma %</th>
+                <th class="text-end">Total a consumir</th>
+                <th class="text-end">Costo unit.</th>
+                <th class="text-end">Costo total</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for r in costos.filas %}
+                <tr>
+                  <td class="fw-bold">{{ r.material.nombre }}</td>
+                  <td class="text-end">{{ r.consumo_por_unidad_real }}</td>
+                  <td class="text-end">{{ r.merma_porcentaje }}</td>
+                  <td class="text-end">{{ r.consumo_total }}</td>
+                  <td class="text-end">${{ r.costo_unitario_material }}</td>
+                  <td class="text-end fw-bold">${{ r.costo_total_material }}</td>
+                </tr>
+              {% empty %}
+                <tr><td colspan="6" class="text-white-50">Esta fórmula no tiene materiales.</td></tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <div class="card card-bemore mt-3">
+      <div class="card-header">Movimientos generados</div>
+      <div class="card-body">
+        <div class="table-responsive">
+          <table class="table table-bemore align-middle">
+            <thead>
+              <tr>
+                <th>Fecha</th>
+                <th>Tipo</th>
+                <th>Ítem</th>
+                <th class="text-end">Cantidad</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for m in movimientos %}
+                <tr>
+                  <td class="text-white-50">{{ m.creado|date:"Y-m-d H:i" }}</td>
+                  <td>{{ m.get_tipo_display }}</td>
+                  <td>
+                    {% if m.item.tipo == "MATERIAL" and m.item.material %}
+                      Material: {{ m.item.material.nombre }}
+                    {% else %}
+                      Producto: {{ m.item.variante_producto.producto.nombre }} - {{ m.item.variante_producto.nombre }}
+                    {% endif %}
+                  </td>
+                  <td class="text-end">{{ m.cantidad }}</td>
+                </tr>
+              {% empty %}
+                <tr><td colspan="4" class="text-white-50">Aún no hay movimientos generados por este lote.</td></tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+{% endblock %}
