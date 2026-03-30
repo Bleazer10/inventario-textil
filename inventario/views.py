@@ -9,7 +9,7 @@ from django.views.decorators.http import require_POST
 from django.shortcuts import render, redirect, get_object_or_404
 
 from django.db.models import Q, Sum, Case, When, F, Value, DecimalField
-from django.db.models.functions import Coalesce
+from django.db.models.functions import Coalesce, TruncDay, TruncMonth, ExtractWeek, ExtractYear
 
 from .forms import (
     ProductoForm,
@@ -1742,3 +1742,221 @@ def pagar_cxp_gasto(request, cxp_id):
         return redirect("lista_por_pagar_gastos")
 
     return render(request, "finanzas/pagar_gasto_form.html", {"cxp": cxp})
+
+@login_required
+def estadisticas(request):
+    """
+    Estadísticas financieras y de ventas:
+    - Ventas vs Gastos por día (últimos 14 días)
+    - Ventas vs Gastos por semana ISO (últimas 8 semanas)
+    - Ventas vs Gastos por mes (últimos 12 meses)
+    - Top productos (por monto y por cantidad)
+    - Gastos por categoría
+    """
+
+    hoy = date.today()
+
+    # =========================
+    # 1) VENTAS / GASTOS POR DÍA
+    # =========================
+    dias = 14
+    fi_dia = hoy - timedelta(days=dias - 1)
+
+    ventas_dia_qs = (
+        Venta.objects
+        .filter(fecha__gte=fi_dia, fecha__lte=hoy, estado=Venta.Estado.CONFIRMADA)
+        .annotate(d=TruncDay("fecha"))
+        .values("d")
+        .annotate(total=Coalesce(Sum("total"), Decimal("0.00")))
+        .order_by("d")
+    )
+
+    gastos_dia_qs = (
+        Gasto.objects
+        .filter(fecha__gte=fi_dia, fecha__lte=hoy)
+        .annotate(d=TruncDay("fecha"))
+        .values("d")
+        .annotate(total=Coalesce(Sum("monto"), Decimal("0.00")))
+        .order_by("d")
+    )
+
+    mapa_ventas_dia = {row["d"]: row["total"] for row in ventas_dia_qs}
+    mapa_gastos_dia = {row["d"]: row["total"] for row in gastos_dia_qs}
+
+    labels_dia = []
+    ventas_dia = []
+    gastos_dia = []
+    for i in range(dias):
+        d = fi_dia + timedelta(days=i)
+        labels_dia.append(d.strftime("%Y-%m-%d"))
+        ventas_dia.append(float(mapa_ventas_dia.get(d, Decimal("0.00"))))
+        gastos_dia.append(float(mapa_gastos_dia.get(d, Decimal("0.00"))))
+
+    # =========================
+    # 2) VENTAS / GASTOS POR SEMANA ISO (Año + Semana)
+    #    (MySQL friendly: ExtractYear + ExtractWeek)
+    # =========================
+    semanas = 8
+    fi_sem = hoy - timedelta(days=7 * semanas)
+
+    ventas_sem_qs = (
+        Venta.objects
+        .filter(fecha__gte=fi_sem, fecha__lte=hoy, estado=Venta.Estado.CONFIRMADA)
+        .annotate(y=ExtractYear("fecha"), w=ExtractWeek("fecha"))
+        .values("y", "w")
+        .annotate(total=Coalesce(Sum("total"), Decimal("0.00")))
+        .order_by("y", "w")
+    )
+
+    gastos_sem_qs = (
+        Gasto.objects
+        .filter(fecha__gte=fi_sem, fecha__lte=hoy)
+        .annotate(y=ExtractYear("fecha"), w=ExtractWeek("fecha"))
+        .values("y", "w")
+        .annotate(total=Coalesce(Sum("monto"), Decimal("0.00")))
+        .order_by("y", "w")
+    )
+
+    mapa_ventas_sem = {(r["y"], r["w"]): r["total"] for r in ventas_sem_qs}
+    mapa_gastos_sem = {(r["y"], r["w"]): r["total"] for r in gastos_sem_qs}
+
+    # Construimos la lista de semanas a mostrar (últimas N semanas)
+    # Nota: esto usa el calendario ISO de Python para etiquetas consistentes.
+    labels_sem = []
+    ventas_sem = []
+    gastos_sem = []
+
+    # Genera semanas hacia atrás y luego invierte para orden cronológico
+    semanas_keys = []
+    dtmp = hoy
+    for _ in range(semanas):
+        y, w, _ = dtmp.isocalendar()
+        semanas_keys.append((y, w))
+        dtmp = dtmp - timedelta(days=7)
+
+    semanas_keys = list(reversed(list(dict.fromkeys(reversed(semanas_keys)))))  # únicos + orden
+    # Si por cruce de año faltan semanas, no pasa nada; es un rango aproximado “últimas 8”
+    for (y, w) in semanas_keys[-semanas:]:
+        labels_sem.append(f"{y}-W{int(w):02d}")
+        ventas_sem.append(float(mapa_ventas_sem.get((y, int(w)), Decimal("0.00"))))
+        gastos_sem.append(float(mapa_gastos_sem.get((y, int(w)), Decimal("0.00"))))
+
+    # =========================
+    # 3) VENTAS / GASTOS POR MES (últimos 12 meses)
+    # =========================
+    meses = 12
+    fi_mes = (hoy.replace(day=1) - timedelta(days=1)).replace(day=1)  # inicio del mes pasado
+    # volver 11 meses atrás aproximadamente (para cubrir 12)
+    fi_mes = (fi_mes - timedelta(days=330)).replace(day=1)
+
+    ventas_mes_qs = (
+        Venta.objects
+        .filter(fecha__gte=fi_mes, fecha__lte=hoy, estado=Venta.Estado.CONFIRMADA)
+        .annotate(m=TruncMonth("fecha"))
+        .values("m")
+        .annotate(total=Coalesce(Sum("total"), Decimal("0.00")))
+        .order_by("m")
+    )
+
+    gastos_mes_qs = (
+        Gasto.objects
+        .filter(fecha__gte=fi_mes, fecha__lte=hoy)
+        .annotate(m=TruncMonth("fecha"))
+        .values("m")
+        .annotate(total=Coalesce(Sum("monto"), Decimal("0.00")))
+        .order_by("m")
+    )
+
+    mapa_ventas_mes = {row["m"]: row["total"] for row in ventas_mes_qs}
+    mapa_gastos_mes = {row["m"]: row["total"] for row in gastos_mes_qs}
+
+    # lista de meses (12) hacia atrás desde el mes actual
+    labels_mes = []
+    ventas_mes = []
+    gastos_mes = []
+
+    # Armamos meses a partir del 1er día del mes actual
+    base_mes = hoy.replace(day=1)
+    meses_list = []
+    for i in range(meses - 1, -1, -1):
+        # retroceder i meses aprox usando días (simple y suficiente)
+        m = (base_mes - timedelta(days=31 * i)).replace(day=1)
+        meses_list.append(m)
+
+    # Normalizar únicos por si se repite por el método aproximado
+    meses_list = sorted(set(meses_list))[-meses:]
+
+    for m in meses_list:
+        labels_mes.append(m.strftime("%Y-%m"))
+        ventas_mes.append(float(mapa_ventas_mes.get(m, Decimal("0.00"))))
+        gastos_mes.append(float(mapa_gastos_mes.get(m, Decimal("0.00"))))
+
+    # =========================
+    # 4) TOP PRODUCTOS (por monto y cantidad)
+    # =========================
+    top_productos = (
+        DetalleVenta.objects
+        .filter(venta__estado=Venta.Estado.CONFIRMADA)
+        .values(
+            "variante_producto__producto__nombre",
+            "variante_producto__nombre",
+            "variante_producto__sku",
+        )
+        .annotate(
+            cantidad=Coalesce(Sum("cantidad"), Decimal("0.00")),
+            monto=Coalesce(Sum("subtotal"), Decimal("0.00")),
+        )
+        .order_by("-monto")[:10]
+    )
+
+    # =========================
+    # 5) GASTOS POR CATEGORÍA (rango último mes)
+    # =========================
+    fi_gastos_cat = hoy - timedelta(days=30)
+    gastos_por_categoria = (
+        Gasto.objects
+        .filter(fecha__gte=fi_gastos_cat, fecha__lte=hoy)
+        .values("categoria__nombre")
+        .annotate(total=Coalesce(Sum("monto"), Decimal("0.00")))
+        .order_by("-total")
+    )
+
+    # =========================
+    # Cards resumen (últimos 30 días)
+    # =========================
+    fi_resumen = hoy - timedelta(days=30)
+    ventas_30 = (
+        Venta.objects.filter(fecha__gte=fi_resumen, fecha__lte=hoy, estado=Venta.Estado.CONFIRMADA)
+        .aggregate(s=Coalesce(Sum("total"), Decimal("0.00")))["s"]
+    ).quantize(Decimal("0.01"))
+
+    gastos_30 = (
+        Gasto.objects.filter(fecha__gte=fi_resumen, fecha__lte=hoy)
+        .aggregate(s=Coalesce(Sum("monto"), Decimal("0.00")))["s"]
+    ).quantize(Decimal("0.01"))
+
+    balance_30 = (ventas_30 - gastos_30).quantize(Decimal("0.01"))
+
+    return render(request, "estadisticas/estadisticas.html", {
+        # Cards
+        "ventas_30": ventas_30,
+        "gastos_30": gastos_30,
+        "balance_30": balance_30,
+
+        # Charts
+        "labels_dia": labels_dia,
+        "ventas_dia": ventas_dia,
+        "gastos_dia": gastos_dia,
+
+        "labels_sem": labels_sem,
+        "ventas_sem": ventas_sem,
+        "gastos_sem": gastos_sem,
+
+        "labels_mes": labels_mes,
+        "ventas_mes": ventas_mes,
+        "gastos_mes": gastos_mes,
+
+        # Tablas
+        "top_productos": top_productos,
+        "gastos_por_categoria": gastos_por_categoria,
+    })

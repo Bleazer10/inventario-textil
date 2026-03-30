@@ -48,9 +48,69 @@
 </div>
 
 <div class="card card-bemore mt-4">
-  <div class="card-header">Movimientos recientes</div>
+  <div class="card-header d-flex justify-content-between align-items-center">
+    <span>Movimientos recientes (últimos 7 días)</span>
+    <div class="d-flex gap-2">
+      <a class="btn btn-sm btn-outline-light fw-bold" href="{% url 'movimientos' %}">Ver movimientos</a>
+      <a class="btn btn-sm btn-outline-light fw-bold" href="{% url 'estadisticas' %}">Ver estadísticas</a>
+    </div>
+  </div>
+
   <div class="card-body">
-    <div class="text-white-50">Aquí verás las últimas ventas, gastos y pagos.</div>
+    <div class="row g-3">
+
+      <!-- Ventas -->
+      <div class="col-lg-4">
+        <div class="fw-bold mb-2">Ventas</div>
+        <ul class="list-group list-group-flush">
+          {% for v in ultimas_ventas %}
+            <li class="list-group-item bg-transparent text-white d-flex justify-content-between align-items-center px-0">
+              <span class="text-white-50">
+                {{ v.fecha }} • #{{ v.id }} • {{ v.cliente.nombre|default:"General" }}
+              </span>
+              <span class="fw-bold">${{ v.total }}</span>
+            </li>
+          {% empty %}
+            <li class="list-group-item bg-transparent text-white-50 px-0">No hay ventas recientes.</li>
+          {% endfor %}
+        </ul>
+      </div>
+
+      <!-- Gastos -->
+      <div class="col-lg-4">
+        <div class="fw-bold mb-2">Gastos</div>
+        <ul class="list-group list-group-flush">
+          {% for g in ultimos_gastos %}
+            <li class="list-group-item bg-transparent text-white d-flex justify-content-between align-items-center px-0">
+              <span class="text-white-50">
+                {{ g.fecha }} • #{{ g.id }} • {{ g.categoria.nombre }}
+              </span>
+              <span class="fw-bold">${{ g.monto }}</span>
+            </li>
+          {% empty %}
+            <li class="list-group-item bg-transparent text-white-50 px-0">No hay gastos recientes.</li>
+          {% endfor %}
+        </ul>
+      </div>
+
+      <!-- Pagos -->
+      <div class="col-lg-4">
+        <div class="fw-bold mb-2">Pagos / Cobros</div>
+        <ul class="list-group list-group-flush">
+          {% for p in ultimos_pagos %}
+            <li class="list-group-item bg-transparent text-white d-flex justify-content-between align-items-center px-0">
+              <span class="text-white-50">
+                {{ p.fecha }} • {{ p.get_direccion_display }} • {{ p.metodo|default:"-" }}
+              </span>
+              <span class="fw-bold">${{ p.monto }}</span>
+            </li>
+          {% empty %}
+            <li class="list-group-item bg-transparent text-white-50 px-0">No hay pagos/cobros recientes.</li>
+          {% endfor %}
+        </ul>
+      </div>
+
+    </div>
   </div>
 </div>
 {% endblock %}

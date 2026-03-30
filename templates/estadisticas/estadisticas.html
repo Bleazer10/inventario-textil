@@ -1,0 +1,208 @@
+{% extends "base.html" %}
+{% block titulo %}Estadísticas{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <div>
+    <h2 class="fw-black mb-0">Estadísticas</h2>
+    <div class="text-white-50">Resumen y gráficas (ventas vs gastos)</div>
+  </div>
+</div>
+
+<!-- Cards resumen -->
+<div class="row g-3 mb-4">
+  <div class="col-md-4">
+    <div class="card card-bemore p-3">
+      <div class="text-white-50">Ventas (últimos 30 días)</div>
+      <div class="fs-3 fw-black">${{ ventas_30 }}</div>
+    </div>
+  </div>
+  <div class="col-md-4">
+    <div class="card card-bemore p-3">
+      <div class="text-white-50">Gastos (últimos 30 días)</div>
+      <div class="fs-3 fw-black">${{ gastos_30 }}</div>
+    </div>
+  </div>
+  <div class="col-md-4">
+    <div class="card card-bemore p-3">
+      <div class="text-white-50">Balance (30 días)</div>
+      <div class="fs-3 fw-black">${{ balance_30 }}</div>
+    </div>
+  </div>
+</div>
+
+<!-- Tabs gráficos -->
+<ul class="nav nav-tabs mb-3" role="tablist">
+  <li class="nav-item">
+    <button class="nav-link active" data-bs-toggle="tab" data-bs-target="#tab-dia" type="button">Día</button>
+  </li>
+  <li class="nav-item">
+    <button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-semana" type="button">Semana (ISO)</button>
+  </li>
+  <li class="nav-item">
+    <button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-mes" type="button">Mes</button>
+  </li>
+</ul>
+
+<div class="tab-content">
+  <div class="tab-pane fade show active" id="tab-dia">
+    <div class="card card-bemore">
+      <div class="card-header">Ventas vs Gastos (últimos 14 días)</div>
+      <div class="card-body">
+        <canvas id="chartDia" height="110"></canvas>
+      </div>
+    </div>
+  </div>
+
+  <div class="tab-pane fade" id="tab-semana">
+    <div class="card card-bemore">
+      <div class="card-header">Ventas vs Gastos (últimas 8 semanas ISO)</div>
+      <div class="card-body">
+        <canvas id="chartSemana" height="110"></canvas>
+      </div>
+    </div>
+  </div>
+
+  <div class="tab-pane fade" id="tab-mes">
+    <div class="card card-bemore">
+      <div class="card-header">Ventas vs Gastos (últimos 12 meses)</div>
+      <div class="card-body">
+        <canvas id="chartMes" height="110"></canvas>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Tablas -->
+<div class="row g-3 mt-4">
+  <div class="col-lg-7">
+    <div class="card card-bemore">
+      <div class="card-header">Top 10 productos (por monto)</div>
+      <div class="card-body">
+        <div class="table-responsive">
+          <table class="table table-bemore align-middle">
+            <thead>
+              <tr>
+                <th>Producto</th>
+                <th>Variante</th>
+                <th>SKU</th>
+                <th class="text-end">Cantidad</th>
+                <th class="text-end">Monto</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for p in top_productos %}
+                <tr>
+                  <td class="fw-bold">{{ p.variante_producto__producto__nombre }}</td>
+                  <td class="text-white-50">{{ p.variante_producto__nombre }}</td>
+                  <td class="text-white-50">{{ p.variante_producto__sku }}</td>
+                  <td class="text-end">{{ p.cantidad }}</td>
+                  <td class="text-end fw-black">${{ p.monto }}</td>
+                </tr>
+              {% empty %}
+                <tr><td colspan="5" class="text-white-50">No hay datos aún.</td></tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+        <div class="text-white-50 small">* Basado en ventas confirmadas.</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-lg-5">
+    <div class="card card-bemore">
+      <div class="card-header">Gastos por categoría (últimos 30 días)</div>
+      <div class="card-body">
+        <div class="table-responsive">
+          <table class="table table-bemore align-middle">
+            <thead>
+              <tr>
+                <th>Categoría</th>
+                <th class="text-end">Total</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for g in gastos_por_categoria %}
+                <tr>
+                  <td class="fw-bold">{{ g.categoria__nombre }}</td>
+                  <td class="text-end fw-black">${{ g.total }}</td>
+                </tr>
+              {% empty %}
+                <tr><td colspan="2" class="text-white-50">No hay gastos aún.</td></tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Datos JSON seguros -->
+{{ labels_dia|json_script:"labels_dia" }}
+{{ ventas_dia|json_script:"ventas_dia" }}
+{{ gastos_dia|json_script:"gastos_dia" }}
+
+{{ labels_sem|json_script:"labels_sem" }}
+{{ ventas_sem|json_script:"ventas_sem" }}
+{{ gastos_sem|json_script:"gastos_sem" }}
+
+{{ labels_mes|json_script:"labels_mes" }}
+{{ ventas_mes|json_script:"ventas_mes" }}
+{{ gastos_mes|json_script:"gastos_mes" }}
+
+<!-- Chart.js CDN -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+<script>
+  function readJSON(id){ return JSON.parse(document.getElementById(id).textContent); }
+
+  const dataDia = {
+    labels: readJSON("labels_dia"),
+    ventas: readJSON("ventas_dia"),
+    gastos: readJSON("gastos_dia"),
+  };
+
+  const dataSemana = {
+    labels: readJSON("labels_sem"),
+    ventas: readJSON("ventas_sem"),
+    gastos: readJSON("gastos_sem"),
+  };
+
+  const dataMes = {
+    labels: readJSON("labels_mes"),
+    ventas: readJSON("ventas_mes"),
+    gastos: readJSON("gastos_mes"),
+  };
+
+  function buildChart(canvasId, dataset){
+    const ctx = document.getElementById(canvasId);
+    if(!ctx) return;
+
+    return new Chart(ctx, {
+      type: "line",
+      data: {
+        labels: dataset.labels,
+        datasets: [
+          { label: "Ventas", data: dataset.ventas, tension: 0.25 },
+          { label: "Gastos", data: dataset.gastos, tension: 0.25 },
+        ]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: { legend: { display: true } },
+        scales: {
+          y: { beginAtZero: true }
+        }
+      }
+    });
+  }
+
+  // Crear charts
+  buildChart("chartDia", dataDia);
+  buildChart("chartSemana", dataSemana);
+  buildChart("chartMes", dataMes);
+</script>
+{% endblock %}

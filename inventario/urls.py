@@ -79,4 +79,6 @@ urlpatterns = [
 
     path("finanzas/por-pagar/gastos/", views.lista_por_pagar_gastos, name="lista_por_pagar_gastos"),
     path("finanzas/por-pagar/gastos/<int:cxp_id>/pagar/", views.pagar_cxp_gasto, name="pagar_cxp_gasto"),
+    
+    path("finanzas/estadisticas/", views.estadisticas, name="estadisticas"),
     ]
