@@ -1,6 +1,15 @@
 {% extends "base.html" %}
 {% block titulo %}Pagar compra{% endblock %}
 
+{% block breadcrumbs %}
+<nav aria-label="breadcrumb">
+  <ol class="breadcrumb">
+    <li class="breadcrumb-item"><a href="{% url 'dashboard' %}"><i class="fa-solid fa-home"></i></a></li>
+    <li class="breadcrumb-item active">Pagar compra</li>
+  </ol>
+</nav>
+{% endblock %}
+
 {% block content %}
 <div class="mb-3">
   <h2 class="fw-black mb-0">Registrar pago (Compra)</h2>

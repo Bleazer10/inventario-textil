@@ -8,7 +8,7 @@ from django.contrib.auth.decorators import login_required
 from django.views.decorators.http import require_POST
 from django.shortcuts import render, redirect, get_object_or_404
 
-from django.db.models import Q, Sum, Case, When, F, Value, DecimalField
+from django.db.models import Q, Sum, Case, When, F, Value, DecimalField, IntegerField, Func
 from django.db.models.functions import Coalesce, TruncDay, TruncMonth, ExtractWeek, ExtractYear
 
 from .forms import (
@@ -273,6 +273,18 @@ def nueva_venta(request):
                 variante_producto=variante,
                 defaults={"punto_reorden": 0, "activo": True},
             )
+
+            # Registrar salida por venta (con validación de stock)
+            stock = stock_actual_item(item)
+            if cantidad > stock:
+                messages.error(
+                    request,
+                    f"No hay stock suficiente para {variante.producto.nombre} - {variante.nombre}. "
+                    f"Disponible: {stock} | Intentas vender: {cantidad}"
+                )
+                # opción simple: borrar la venta creada para no dejar registros incompletos
+                venta.delete()
+                return redirect("nueva_venta")
 
             MovimientoInventario.objects.create(
                 item=item,
@@ -1431,7 +1443,7 @@ def consumir_materiales_lote(request, lote_id):
     # Calcular consumos
     costos = _calcular_costos_lote(lote)
 
-    # Crear SALIDAS de materiales
+    # ✅ VALIDAR STOCK ANTES DE CONSUMIR
     for fila in costos["filas"]:
         material = fila["material"]
         consumo_total = fila["consumo_total"]
@@ -1442,6 +1454,15 @@ def consumir_materiales_lote(request, lote_id):
             material=material,
             defaults={"punto_reorden": 0, "activo": True},
         )
+
+        stock = stock_actual_item(item)
+        if consumo_total > stock:
+            messages.error(
+                request,
+                f"Stock insuficiente para material '{material.nombre}'. "
+                f"Disponible: {stock} | Necesario: {consumo_total}"
+            )
+            return redirect("detalle_lote", lote_id=lote.id)
 
         MovimientoInventario.objects.create(
             item=item,
@@ -1501,11 +1522,26 @@ def finalizar_lote(request, lote_id):
     messages.success(request, "Lote finalizado. Se registró la ENTRADA del producto terminado.")
     return redirect("detalle_lote", lote_id=lote.id)
 
-# -------------------------
-# Helpers pagos
-# -------------------------
-def _registrar_pago_entrada(cxc: CuentaPorCobrar, monto: Decimal, metodo: str, fecha_pago, nota: str):
-    # Crea pago (entrada)
+from django.db import transaction
+from decimal import Decimal
+
+def _estado_pago_desde_saldo(saldo: Decimal, monto_total: Decimal) -> str:
+    """
+    Retorna: "PAGADA" / "PENDIENTE" / "PARCIAL"
+    """
+    saldo = saldo.quantize(Decimal("0.01"))
+    monto_total = monto_total.quantize(Decimal("0.01"))
+
+    if saldo <= Decimal("0.00"):
+        return "PAGADA"
+    if saldo == monto_total:
+        return "PENDIENTE"
+    return "PARCIAL"
+
+
+@transaction.atomic
+def _registrar_pago_entrada(cxc: "CuentaPorCobrar", monto: Decimal, metodo: str, fecha_pago, nota: str):
+    # 1) Pago ENTRADA
     Pago.objects.create(
         direccion=Pago.Direccion.ENTRADA,
         metodo=metodo or None,
@@ -1515,16 +1551,27 @@ def _registrar_pago_entrada(cxc: CuentaPorCobrar, monto: Decimal, metodo: str, f
         nota=nota or None,
     )
 
-    # Actualiza montos
+    # 2) Actualizar CuentaPorCobrar
     cxc.monto_pagado = (cxc.monto_pagado + monto).quantize(Decimal("0.01"))
     cxc.saldo = (cxc.monto_total - cxc.monto_pagado).quantize(Decimal("0.01"))
+
     if cxc.saldo <= 0:
         cxc.saldo = Decimal("0.00")
         cxc.estado = CuentaPorCobrar.Estado.CERRADA
+
     cxc.save(update_fields=["monto_pagado", "saldo", "estado"])
 
+    # 3) ✅ Sincronizar Venta (si existe)
+    if cxc.venta_id:
+        venta = cxc.venta
+        venta.monto_pagado = cxc.monto_pagado
+        venta.saldo_pendiente = cxc.saldo
+        venta.save(update_fields=["monto_pagado", "saldo_pendiente"])
 
-def _registrar_pago_salida_compra(cxp: CuentaPorPagarCompra, monto: Decimal, metodo: str, fecha_pago, nota: str):
+
+@transaction.atomic
+def _registrar_pago_salida_compra(cxp: "CuentaPorPagarCompra", monto: Decimal, metodo: str, fecha_pago, nota: str):
+    # 1) Pago SALIDA
     Pago.objects.create(
         direccion=Pago.Direccion.SALIDA,
         metodo=metodo or None,
@@ -1533,15 +1580,26 @@ def _registrar_pago_salida_compra(cxp: CuentaPorPagarCompra, monto: Decimal, met
         cuenta_por_pagar_compra=cxp,
         nota=nota or None,
     )
+
+    # 2) Actualizar CuentaPorPagarCompra
     cxp.monto_pagado = (cxp.monto_pagado + monto).quantize(Decimal("0.01"))
     cxp.saldo = (cxp.monto_total - cxp.monto_pagado).quantize(Decimal("0.01"))
+
     if cxp.saldo <= 0:
         cxp.saldo = Decimal("0.00")
         cxp.estado = CuentaPorPagarCompra.Estado.CERRADA
+
     cxp.save(update_fields=["monto_pagado", "saldo", "estado"])
 
+    # 3) ✅ Sincronizar Compra.estado_pago (PENDIENTE / PARCIAL / PAGADA)
+    compra = cxp.compra
+    compra.estado_pago = _estado_pago_desde_saldo(cxp.saldo, cxp.monto_total)
+    compra.save(update_fields=["estado_pago"])
 
-def _registrar_pago_salida_gasto(cxp: CuentaPorPagarGasto, monto: Decimal, metodo: str, fecha_pago, nota: str):
+
+@transaction.atomic
+def _registrar_pago_salida_gasto(cxp: "CuentaPorPagarGasto", monto: Decimal, metodo: str, fecha_pago, nota: str):
+    # 1) Pago SALIDA
     Pago.objects.create(
         direccion=Pago.Direccion.SALIDA,
         metodo=metodo or None,
@@ -1550,13 +1608,50 @@ def _registrar_pago_salida_gasto(cxp: CuentaPorPagarGasto, monto: Decimal, metod
         cuenta_por_pagar_gasto=cxp,
         nota=nota or None,
     )
+
+    # 2) Actualizar CuentaPorPagarGasto
     cxp.monto_pagado = (cxp.monto_pagado + monto).quantize(Decimal("0.01"))
     cxp.saldo = (cxp.monto_total - cxp.monto_pagado).quantize(Decimal("0.01"))
+
     if cxp.saldo <= 0:
         cxp.saldo = Decimal("0.00")
         cxp.estado = CuentaPorPagarGasto.Estado.CERRADA
+
     cxp.save(update_fields=["monto_pagado", "saldo", "estado"])
 
+    # 3) ✅ Sincronizar Gasto.estado_pago (PENDIENTE / PARCIAL / PAGADO)
+    gasto = cxp.gasto
+    estado = _estado_pago_desde_saldo(cxp.saldo, cxp.monto_total)
+
+    if estado == "PAGADA":
+        gasto.estado_pago = Gasto.EstadoPago.PAGADO
+    elif estado == "PENDIENTE":
+        gasto.estado_pago = Gasto.EstadoPago.PENDIENTE
+    else:
+        gasto.estado_pago = Gasto.EstadoPago.PARCIAL
+
+    gasto.save(update_fields=["estado_pago"])
+
+
+def stock_actual_item(item: ItemInventario) -> Decimal:
+    """
+    Stock = ENTRADA + AJUSTE - SALIDA
+    """
+    agg = item.movimientos.aggregate(
+        stock=Coalesce(
+            Sum(
+                Case(
+                    When(tipo=MovimientoInventario.TipoMovimiento.SALIDA, then=F("cantidad") * Value(Decimal("-1"))),
+                    When(tipo=MovimientoInventario.TipoMovimiento.ENTRADA, then=F("cantidad")),
+                    When(tipo=MovimientoInventario.TipoMovimiento.AJUSTE, then=F("cantidad")),
+                    default=Value(Decimal("0.00")),
+                    output_field=DecimalField(max_digits=12, decimal_places=2),
+                )
+            ),
+            Value(Decimal("0.00")),
+        )
+    )
+    return (agg["stock"] or Decimal("0.00")).quantize(Decimal("0.01"))
 
 # -------------------------
 # POR COBRAR
@@ -1792,54 +1887,59 @@ def estadisticas(request):
         ventas_dia.append(float(mapa_ventas_dia.get(d, Decimal("0.00"))))
         gastos_dia.append(float(mapa_gastos_dia.get(d, Decimal("0.00"))))
 
-    # =========================
-    # 2) VENTAS / GASTOS POR SEMANA ISO (Año + Semana)
-    #    (MySQL friendly: ExtractYear + ExtractWeek)
+   # =========================
+    # 2) VENTAS / GASTOS POR SEMANA ISO REAL (MySQL: YEARWEEK(fecha, 3))
     # =========================
     semanas = 8
     fi_sem = hoy - timedelta(days=7 * semanas)
 
+    # Query agrupada por YEARWEEK ISO
     ventas_sem_qs = (
         Venta.objects
         .filter(fecha__gte=fi_sem, fecha__lte=hoy, estado=Venta.Estado.CONFIRMADA)
-        .annotate(y=ExtractYear("fecha"), w=ExtractWeek("fecha"))
-        .values("y", "w")
+        .annotate(
+            yw=Func(F("fecha"), Value(3), function="YEARWEEK", output_field=IntegerField())
+        )
+        .values("yw")
         .annotate(total=Coalesce(Sum("total"), Decimal("0.00")))
-        .order_by("y", "w")
+        .order_by("yw")
     )
 
     gastos_sem_qs = (
         Gasto.objects
         .filter(fecha__gte=fi_sem, fecha__lte=hoy)
-        .annotate(y=ExtractYear("fecha"), w=ExtractWeek("fecha"))
-        .values("y", "w")
+        .annotate(
+            yw=Func(F("fecha"), Value(3), function="YEARWEEK", output_field=IntegerField())
+        )
+        .values("yw")
         .annotate(total=Coalesce(Sum("monto"), Decimal("0.00")))
-        .order_by("y", "w")
+        .order_by("yw")
     )
 
-    mapa_ventas_sem = {(r["y"], r["w"]): r["total"] for r in ventas_sem_qs}
-    mapa_gastos_sem = {(r["y"], r["w"]): r["total"] for r in gastos_sem_qs}
+    mapa_ventas_sem = {int(r["yw"]): r["total"] for r in ventas_sem_qs}
+    mapa_gastos_sem = {int(r["yw"]): r["total"] for r in gastos_sem_qs}
 
-    # Construimos la lista de semanas a mostrar (últimas N semanas)
-    # Nota: esto usa el calendario ISO de Python para etiquetas consistentes.
+    # ✅ Generar SIEMPRE las últimas 8 semanas ISO (aunque no haya datos)
     labels_sem = []
     ventas_sem = []
     gastos_sem = []
 
-    # Genera semanas hacia atrás y luego invierte para orden cronológico
-    semanas_keys = []
-    dtmp = hoy
-    for _ in range(semanas):
-        y, w, _ = dtmp.isocalendar()
-        semanas_keys.append((y, w))
-        dtmp = dtmp - timedelta(days=7)
+    # Tomamos el lunes de la semana actual y retrocedemos 7 días cada vez
+    lunes_actual = hoy - timedelta(days=hoy.weekday())
+    semanas_yw = []
 
-    semanas_keys = list(reversed(list(dict.fromkeys(reversed(semanas_keys)))))  # únicos + orden
-    # Si por cruce de año faltan semanas, no pasa nada; es un rango aproximado “últimas 8”
-    for (y, w) in semanas_keys[-semanas:]:
-        labels_sem.append(f"{y}-W{int(w):02d}")
-        ventas_sem.append(float(mapa_ventas_sem.get((y, int(w)), Decimal("0.00"))))
-        gastos_sem.append(float(mapa_gastos_sem.get((y, int(w)), Decimal("0.00"))))
+    for i in range(semanas - 1, -1, -1):
+        lunes = lunes_actual - timedelta(days=7 * i)
+
+        # YEARWEEK ISO de ese lunes (misma lógica que MySQL modo 3)
+        iso_year, iso_week, _ = lunes.isocalendar()
+        yw = iso_year * 100 + iso_week
+        semanas_yw.append((iso_year, iso_week, yw))
+
+    for iso_year, iso_week, yw in semanas_yw:
+        labels_sem.append(f"{iso_year}-W{iso_week:02d}")
+        ventas_sem.append(float(mapa_ventas_sem.get(yw, Decimal("0.00"))))
+        gastos_sem.append(float(mapa_gastos_sem.get(yw, Decimal("0.00"))))
 
     # =========================
     # 3) VENTAS / GASTOS POR MES (últimos 12 meses)
