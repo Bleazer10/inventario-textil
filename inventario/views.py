@@ -879,11 +879,20 @@ def nueva_compra(request):
         .order_by("nombre")
     )
 
+    # choices para el select en el template
+    estado_pago_choices = Compra.EstadoPago.choices
+
     if request.method == "POST":
         proveedor_id = request.POST.get("proveedor")
         fecha = request.POST.get("fecha") or str(date.today())
         notas = request.POST.get("notas", "")
+        estado_pago = request.POST.get("estado_pago", Compra.EstadoPago.PENDIENTE)  # ✅ NUEVO
         items_json = request.POST.get("items_json", "[]")
+
+        # ✅ Validar estado_pago (evita que manden cualquier texto)
+        valores_validos = {v for v, _ in Compra.EstadoPago.choices}
+        if estado_pago not in valores_validos:
+            estado_pago = Compra.EstadoPago.PENDIENTE
 
         try:
             items = json.loads(items_json)
@@ -904,7 +913,7 @@ def nueva_compra(request):
             proveedor=proveedor,
             fecha=fecha,
             estado=Compra.Estado.BORRADOR,
-            estado_pago=Compra.EstadoPago.PENDIENTE,
+            estado_pago=estado_pago,  # ✅ AHORA VIENE DEL FORM
             notas=notas,
         )
 
@@ -939,6 +948,7 @@ def nueva_compra(request):
     return render(request, "compras/nueva.html", {
         "proveedores": proveedores,
         "materiales": materiales,
+        "estado_pago_choices": estado_pago_choices,  # ✅ NUEVO
     })
 
 

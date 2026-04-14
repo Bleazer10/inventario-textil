@@ -43,6 +43,18 @@
           </div>
 
           <div class="mb-3">
+            <label class="form-label">Estado de pago</label>
+            <select name="estado_pago" class="form-control" required>
+              {% for value, label in estado_pago_choices %}
+                <option value="{{ value }}">{{ label }}</option>
+              {% endfor %}
+            </select>
+            <div class="form-text text-white-50">
+              Si está Pendiente/Parcial, al recibir la compra se creará una cuenta por pagar.
+            </div>
+          </div>
+
+          <div class="mb-3">
             <label class="form-label">Notas (opcional)</label>
             <textarea name="notas" class="form-control" rows="2"></textarea>
           </div>

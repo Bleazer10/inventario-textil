@@ -1,6 +1,16 @@
 {% extends "base.html" %}
 {% block titulo %}{% if modo == "nueva" %}Nueva fórmula{% else %}Editar fórmula{% endif %}{% endblock %}
 
+{% block breadcrumbs %}
+<nav aria-label="breadcrumb">
+  <ol class="breadcrumb">
+    <li class="breadcrumb-item"><a href="{% url 'dashboard' %}"><i class="fa-solid fa-home"></i></a></li>
+    <li class="breadcrumb-item"><a href="{% url 'lista_formulas' %}">Fórmulas</a></li>
+    <li class="breadcrumb-item active">{% if modo == "nueva" %}Nueva fórmula{% else %}Editar fórmula{% endif %}</li>
+  </ol>
+</nav>
+{% endblock %}
+
 {% block content %}
 <div class="mb-3">
   <h2 class="fw-black mb-0">{% if modo == "nueva" %}Nueva fórmula{% else %}Editar fórmula{% endif %}</h2>
