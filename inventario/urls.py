@@ -1,4 +1,4 @@
-from django.urls import path
+from django.urls import path, include
 from . import views
 
 urlpatterns = [
@@ -81,4 +81,5 @@ urlpatterns = [
     path("finanzas/por-pagar/gastos/<int:cxp_id>/pagar/", views.pagar_cxp_gasto, name="pagar_cxp_gasto"),
     
     path("finanzas/estadisticas/", views.estadisticas, name="estadisticas"),
+    path("reportes/", include("inventario.reportes.urls_reportes")),
     ]
