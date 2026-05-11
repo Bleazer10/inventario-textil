@@ -5,7 +5,7 @@ from inventario.reportes.utils_excel import excel_reporte
 from inventario.models import Venta, DetalleVenta
 from datetime import datetime
 from decimal import Decimal
-from django.db.models import Q, Sum
+from django.db.models import Q, Sum, Min, Max
 from django.db.models.functions import Coalesce
 from django.shortcuts import get_object_or_404
 from reportlab.lib.units import mm
@@ -16,6 +16,33 @@ def _parse_date(s):
         return datetime.strptime(s, "%Y-%m-%d").date()
     except:
         return None
+
+
+def _build_periodo_text(fi, ff, qs):
+    if fi or ff:
+        desde = _fmt_fecha(fi) if fi else ""
+        hasta = _fmt_fecha(ff) if ff else ""
+        if desde and hasta:
+            return f"Periodo: desde {desde} al {hasta}"
+        if desde:
+            return f"Periodo: desde {desde}"
+        if hasta:
+            return f"Periodo: hasta {hasta}"
+        return None
+
+    agregados = qs.aggregate(
+        min_fecha=Min("fecha"),
+        max_fecha=Max("fecha"),
+    )
+    min_fecha = agregados["min_fecha"]
+    max_fecha = agregados["max_fecha"]
+    if min_fecha and max_fecha:
+        return f"Periodo: desde {_fmt_fecha(min_fecha)} al {_fmt_fecha(max_fecha)}"
+    if min_fecha:
+        return f"Periodo: desde {_fmt_fecha(min_fecha)}"
+    if max_fecha:
+        return f"Periodo: hasta {_fmt_fecha(max_fecha)}"
+    return None
 
 
 @login_required
@@ -95,11 +122,12 @@ def reporte_ventas_excel(request):
         ["Saldo pendiente", f"${agg['saldo'].quantize(Decimal('0.01'))}"],
     ]
 
-    filtros = [
-        ["Fecha inicio", str(fi) if fi else ""],
-        ["Fecha fin", str(ff) if ff else ""],
-        ["Búsqueda (q)", q if q else ""],
-    ]
+    periodo = _build_periodo_text(fi, ff, qs)
+    fecha_emision = timezone.localdate()
+    filtros = []
+    if periodo:
+        filtros.append(periodo)
+    filtros.append(f"Fecha de emisión: {_fmt_fecha(fecha_emision)}")
 
     columnas = ["#Venta", "Fecha", "Cliente", "Tipo pago", "Total", "Pagado", "Saldo", "Estado"]
 
@@ -155,11 +183,12 @@ def reporte_ventas_pdf(request):
         ["Total vendido", f"${total_ventas.quantize(Decimal('0.01'))}"],
     ]
 
-    filtros = [
-        ["Fecha inicio", str(fi) if fi else ""],
-        ["Fecha fin", str(ff) if ff else ""],
-        ["Búsqueda (q)", q if q else ""],
-    ]
+    periodo = _build_periodo_text(fi, ff, qs)
+    fecha_emision = timezone.localdate()
+    filtros = []
+    if periodo:
+        filtros.append(periodo)
+    filtros.append(f"Fecha de emisión: {_fmt_fecha(fecha_emision)}")
 
     columnas = ["#Venta", "Fecha", "Cliente", "Tipo pago", "Total", "Pagado", "Saldo", "Estado"]
     filas = []
@@ -186,6 +215,8 @@ def reporte_ventas_pdf(request):
         filas,
         resumen=resumen,
         filtros=filtros,
+        titulo_datos=None,
+        repeat_header=True,
         logo_relpath="img/logo-bemore.jpeg",
         nombre_empresa="BEMORE",
     )
@@ -208,22 +239,20 @@ def reporte_venta_factura_pdf(request, venta_id):
         .order_by("id")
     )
 
-    # ✅ Fecha de emisión
     fecha_emision = timezone.localdate()
 
-    # ✅ Datos de cabecera (2 columnas / 3 filas) como pediste
+    # ✅ Cabecera de factura en 3 filas x 2 columnas, cada celda con etiqueta + valor
+    cliente_nombre = venta.cliente.nombre if venta.cliente else "General"
     filtros = [
-        [f"#Venta: {venta.id}", f"Fecha: {_fmt_fecha(venta.fecha)}"],
-        [f"Tipo de pago: {venta.get_tipo_pago_display()}", f"Estado: {venta.get_estado_display()}"],
-        [f"Cliente: {(venta.cliente.nombre if venta.cliente else 'General')}", f"Emisión: {_fmt_fecha(fecha_emision)}"],
+        [("#Venta", str(venta.id)), ("Fecha", _fmt_fecha(venta.fecha))],
+        [("Tipo de pago", venta.get_tipo_pago_display()), ("Estado", venta.get_estado_display())],
+        [("Cliente", cliente_nombre), ("Emisión Factura", _fmt_fecha(fecha_emision))],
     ]
 
-    # ✅ Resumen en una sola caja (una fila con 3 celdas)
-    resumen = [[
-        f"Total: ${float(venta.total):.2f}",
-        f"Pagado: ${float(venta.monto_pagado):.2f}",
-        f"Saldo: ${float(venta.saldo_pendiente):.2f}",
-    ]]
+    # ✅ Resumen en un solo cuadro vertical (una columna, tres filas)
+    resumen = [
+        [f"Total: ${float(venta.total):.2f}\nPagado: ${float(venta.monto_pagado):.2f}\nSaldo: ${float(venta.saldo_pendiente):.2f}"],
+    ]
 
     # ✅ Tabla detalle (agrandamos Producto para que no se corte)
     columnas = ["SKU", "Producto", "Variante", "Cant.", "Precio", "Desc.", "Subtotal"]
@@ -261,10 +290,11 @@ def reporte_venta_factura_pdf(request, venta_id):
         filtros=filtros,
         resumen=resumen,
 
-        # ✅ Cambios para el diseño
+        # ✅ Cambios para el diseño (sin repetición de página)
         titulo_datos=None,              # quita “Filtros aplicados”
-        resumen_en_una_linea=True,      # resumen en caja única
+        resumen_en_una_linea=True,      # resumen en una sola celda
         col_widths=col_widths,          # producto más ancho
+        repeat_header=False,
 
         logo_relpath="img/logo-bemore.jpeg",
         nombre_empresa="BEMORE",

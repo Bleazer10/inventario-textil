@@ -68,23 +68,37 @@ def excel_reporte(
     filtros_visibles = []
     if filtros:
         for f in filtros:
-            if len(f) >= 2:
-                k = str(f[0]).strip()
-                v = str(f[1]).strip()
-                if v not in ("", "—", "-", "None", "null"):
-                    filtros_visibles.append([k, v])
+            if isinstance(f, str):
+                texto = f.strip()
+                if texto not in ("", "—", "-", "None", "null"):
+                    filtros_visibles.append([texto])
+            elif isinstance(f, (list, tuple)):
+                if len(f) == 1:
+                    texto = str(f[0]).strip()
+                    if texto not in ("", "—", "-", "None", "null"):
+                        filtros_visibles.append([texto])
+                elif len(f) >= 2:
+                    k = str(f[0]).strip()
+                    v = str(f[1]).strip()
+                    if v not in ("", "—", "-", "None", "null"):
+                        filtros_visibles.append([k, v])
 
     if filtros_visibles:
-        ws[f"A{fila_actual}"] = "Filtros aplicados"
-        ws[f"A{fila_actual}"].font = bold
-        fila_actual += 1
-
-        for k, v in filtros_visibles:
-            ws[f"A{fila_actual}"] = k
-            ws[f"B{fila_actual}"] = v
-            ws[f"A{fila_actual}"].fill = fill_section
-            ws[f"A{fila_actual}"].border = border
-            ws[f"B{fila_actual}"].border = border
+        for row in filtros_visibles:
+            if len(row) == 1:
+                texto = row[0]
+                ws[f"A{fila_actual}"] = texto
+                ws.merge_cells(start_row=fila_actual, start_column=1, end_row=fila_actual, end_column=len(columnas))
+                ws[f"A{fila_actual}"].fill = fill_section
+                ws[f"A{fila_actual}"].border = border
+                ws[f"A{fila_actual}"].alignment = Alignment(horizontal="left", vertical="center", wrap_text=True)
+            else:
+                k, v = row
+                ws[f"A{fila_actual}"] = k
+                ws[f"B{fila_actual}"] = v
+                ws[f"A{fila_actual}"].fill = fill_section
+                ws[f"A{fila_actual}"].border = border
+                ws[f"B{fila_actual}"].border = border
             fila_actual += 1
 
         fila_actual += 1
