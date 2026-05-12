@@ -52,8 +52,7 @@
                 <a class="btn btn-sm btn-outline-light" href="{% url 'detalle_lote' l.id %}">Ver</a>
               </td>
             </tr>
-          {% empty %}
-            <tr><td colspan="7" class="text-white-50">No hay lotes.</td></tr>
+
           {% endfor %}
         </tbody>
       </table>

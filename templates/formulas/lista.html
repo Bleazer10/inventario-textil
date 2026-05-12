@@ -48,8 +48,6 @@
                 <a class="btn btn-sm btn-outline-light" href="{% url 'editar_formula' f.id %}">Editar</a>
               </td>
             </tr>
-          {% empty %}
-            <tr><td colspan="5" class="text-white-50">No hay fórmulas.</td></tr>
           {% endfor %}
         </tbody>
       </table>

@@ -103,10 +103,6 @@
 
               <td class="text-white-50">{{ m.nota|default:"" }}</td>
             </tr>
-          {% empty %}
-            <tr>
-              <td colspan="8" class="text-white-50">No hay movimientos en este rango.</td>
-            </tr>
           {% endfor %}
         </tbody>
       </table>

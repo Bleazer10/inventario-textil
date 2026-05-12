@@ -51,8 +51,6 @@
                 <a class="btn btn-sm btn-outline-light" href="{% url 'detalle_compra' c.id %}">Ver</a>
               </td>
             </tr>
-          {% empty %}
-            <tr><td colspan="6" class="text-white-50">No hay compras.</td></tr>
           {% endfor %}
         </tbody>
       </table>

@@ -46,10 +46,6 @@
               <td class="text-end">{{ v.get_modo_costo_display }}</td>
               <td class="text-end">{% if v.activa %}Sí{% else %}No{% endif %}</td>
             </tr>
-          {% empty %}
-            <tr>
-              <td colspan="5" class="text-white-50">No hay variantes para este producto.</td>
-            </tr>
           {% endfor %}
         </tbody>
       </table>

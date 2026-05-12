@@ -51,8 +51,6 @@
                 <a class="btn btn-sm btn-outline-light" href="{% url 'editar_almacen' a.id %}">Editar</a>
               </td>
             </tr>
-          {% empty %}
-            <tr><td colspan="3" class="text-white-50">No hay almacenes creados.</td></tr>
           {% endfor %}
         </tbody>
       </table>

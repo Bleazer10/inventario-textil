@@ -322,24 +322,34 @@
     if (!window.jQuery || !jQuery.fn.DataTable) return;
 
     $(".datatable-bemore").each(function(){
-      // evita doble inicialización
       if ($.fn.DataTable.isDataTable(this)) return;
 
       $(this).DataTable({
         responsive: true,
+        autoWidth: false, // ✅ recomendado (evita tablas raras)
         pageLength: 10,
         lengthMenu: [10, 25, 50, 100],
-        order: [], // no forzar orden al inicio
+        order: [],
         language: {
           search: "Buscar:",
           lengthMenu: "Mostrar _MENU_",
           info: "Mostrando _START_ a _END_ de _TOTAL_",
           infoEmpty: "Mostrando 0 a 0 de 0",
+          emptyTable: "No hay registros para mostrar.",
           zeroRecords: "No se encontraron resultados",
           paginate: { previous: "Anterior", next: "Siguiente" }
         }
       });
     });
+  });
+
+  // ✅ Fix DataTables dentro de tabs (Bootstrap) - SOLO 1 VEZ
+  document.addEventListener("shown.bs.tab", function () {
+    if (!window.jQuery || !jQuery.fn.DataTable) return;
+    $.fn.dataTable
+      .tables({ visible: true, api: true })
+      .columns.adjust()
+      .responsive.recalc();
   });
 </script>
   {% block extra_js %}{% endblock %}

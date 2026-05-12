@@ -48,8 +48,6 @@
                 <a class="btn btn-sm btn-outline-light" href="{% url 'editar_cliente' c.id %}">Editar</a>
               </td>
             </tr>
-          {% empty %}
-            <tr><td colspan="5" class="text-white-50">No hay clientes.</td></tr>
           {% endfor %}
         </tbody>
       </table>
