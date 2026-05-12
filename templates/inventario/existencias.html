@@ -28,53 +28,11 @@
   </div>
 </div>
 
-<div class="card card-bemore mb-3">
-  <div class="card-header">Filtros</div>
-  <div class="card-body">
-    <form method="get" class="row g-2 align-items-end">
-      <div class="col-12 col-md-3">
-        <label class="form-label">Almacén</label>
-        <select name="almacen" class="form-control">
-          <option value="">Todos</option>
-          {% for a in almacenes %}
-            <option value="{{ a.id }}" {% if almacen_id|stringformat:"s" == a.id|stringformat:"s" %}selected{% endif %}>
-              {{ a.nombre }}
-            </option>
-          {% endfor %}
-        </select>
-      </div>
-
-      <div class="col-12 col-md-3">
-        <label class="form-label">Tipo</label>
-        <select name="tipo" class="form-control">
-          <option value="">Todos</option>
-          <option value="MATERIAL" {% if tipo_item == "MATERIAL" %}selected{% endif %}>Material</option>
-          <option value="PRODUCTO" {% if tipo_item == "PRODUCTO" %}selected{% endif %}>Producto terminado</option>
-        </select>
-      </div>
-
-      <div class="col-12 col-md-4">
-        <label class="form-label">Buscar</label>
-        <input type="text" name="q" class="form-control" value="{{ q }}" placeholder="Material, SKU, producto...">
-      </div>
-
-      <div class="col-12 col-md-2 d-flex gap-2">
-        <button class="btn btn-bemore fw-bold w-100" type="submit">
-          <i class="fa-solid fa-filter me-2"></i> Aplicar
-        </button>
-        <a class="btn btn-outline-light fw-bold w-100" href="{% url 'existencias' %}">
-          Limpiar
-        </a>
-      </div>
-    </form>
-  </div>
-</div>
-
 <div class="card card-bemore">
   <div class="card-header">Stock actual</div>
   <div class="card-body">
-    <div class="table-responsive">
-      <table class="table table-bemore align-middle">
+    <div class="table-responsive bemore-table-wrap">
+      <table class="table table-bemore align-middle datatable-bemore">
         <thead>
           <tr>
             <th>Almacén</th>
@@ -104,13 +62,9 @@
                 {% endif %}
               </td>
 
-              <td class="text-end fw-black">
-                {{ stock }}
-              </td>
+              <td class="text-end fw-black">{{ stock }}</td>
 
-              <td class="text-end">
-                {{ it.punto_reorden }}
-              </td>
+              <td class="text-end">{{ it.punto_reorden }}</td>
 
               <td class="text-end">
                 {% if it.punto_reorden > 0 and stock <= it.punto_reorden %}
@@ -123,7 +77,7 @@
             {% endwith %}
           {% empty %}
             <tr>
-              <td colspan="6" class="text-white-50">No hay ítems de inventario para mostrar con estos filtros.</td>
+              <td colspan="6" class="text-white-50">No hay ítems de inventario para mostrar.</td>
             </tr>
           {% endfor %}
         </tbody>

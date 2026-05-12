@@ -18,40 +18,11 @@
   </div>
 </div>
 
-<div class="card card-bemore mb-3">
-  <div class="card-header">Filtros</div>
-  <div class="card-body">
-    <form method="get" class="row g-2 align-items-end">
-      <div class="col-12 col-md-5">
-        <label class="form-label">Buscar</label>
-        <input class="form-control" name="q" value="{{ q }}" placeholder="Cliente o # venta...">
-      </div>
-
-      <div class="col-6 col-md-4">
-        <label class="form-label">Estado</label>
-        <select class="form-control" name="estado">
-          <option value="">Todos</option>
-          {% for val, label in estados %}
-            <option value="{{ val }}" {% if estado == val %}selected{% endif %}>{{ label }}</option>
-          {% endfor %}
-        </select>
-      </div>
-
-      <div class="col-6 col-md-3 d-flex gap-2">
-        <button class="btn btn-bemore fw-bold w-100" type="submit">
-          <i class="fa-solid fa-filter me-2"></i> Aplicar
-        </button>
-        <a class="btn btn-outline-light fw-bold w-100" href="{% url 'lista_por_cobrar' %}">Limpiar</a>
-      </div>
-    </form>
-  </div>
-</div>
-
 <div class="card card-bemore">
   <div class="card-header">Listado</div>
   <div class="card-body">
-    <div class="table-responsive">
-      <table class="table table-bemore align-middle">
+    <div class="table-responsive bemore-table-wrap">
+      <table class="table table-bemore align-middle datatable-bemore">
         <thead>
           <tr>
             <th>#</th>

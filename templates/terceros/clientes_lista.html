@@ -22,22 +22,12 @@
   </a>
 </div>
 
-<div class="card card-bemore mb-3">
-  <div class="card-body">
-    <form method="get" class="d-flex gap-2">
-      <input class="form-control" name="q" value="{{ q }}" placeholder="Buscar por nombre, teléfono, email...">
-      <button class="btn btn-outline-light fw-bold" type="submit">
-        <i class="fa-solid fa-magnifying-glass me-2"></i> Buscar
-      </button>
-    </form>
-  </div>
-</div>
 
 <div class="card card-bemore">
   <div class="card-header">Listado</div>
   <div class="card-body">
-    <div class="table-responsive">
-      <table class="table table-bemore align-middle">
+    <div class="table-responsive bemore-table-wrap">
+      <table class="table table-bemore align-middle datatable-bemore">
         <thead>
           <tr>
             <th>Nombre</th>

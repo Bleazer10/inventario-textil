@@ -112,15 +112,24 @@ main {
 
 /* Dropdown menú dark mejorado */
 .dropdown-menu-dark{
-  background: rgba(15,15,15,.96);
-  border: 1px solid var(--border);
+  background: rgba(15,15,15,.98);
+  border: 1px solid rgba(255,255,255,.12);
+}
+
+.dropdown-menu-dark .dropdown-item{
+  color: rgba(255,255,255,.95);
+}
+.dropdown-menu-dark .dropdown-item:hover,
+.dropdown-menu-dark .dropdown-item:focus{
+  background: rgba(255,255,255,.12);
+  color: #fff;
 }
 
 /* Paginación (por si la usas) */
 .pagination .page-link{
-  color: rgba(255,255,255,.85);
-  background: rgba(17,17,17,.75);
-  border-color: rgba(255,255,255,.12);
+  color: rgba(255,255,255,.95);
+  background: rgba(17,17,17,.85);
+  border-color: rgba(255,255,255,.18);
 }
 .pagination .page-item.active .page-link{
   background: var(--bemore-orange);
@@ -362,4 +371,87 @@ input:-webkit-autofill:focus{
   background: rgba(59,130,246,.14);
   border-color: rgba(59,130,246,.25);
   color: rgba(59,130,246,1);
+}
+
+/* =========================
+   DataTables - tema oscuro BEMORE (mejorado)
+========================= */
+
+.dataTables_wrapper .dataTables_length,
+.dataTables_wrapper .dataTables_filter,
+.dataTables_wrapper .dataTables_info,
+.dataTables_wrapper .dataTables_paginate{
+  color: rgba(255,255,255,.75) !important;
+}
+
+/* Inputs (Buscar) y Select (Mostrar) */
+.dataTables_wrapper .dataTables_filter input,
+.dataTables_wrapper .dataTables_length select{
+  background: rgba(255,255,255,.08) !important;
+  border: 1px solid rgba(255,255,255,.14) !important;
+  color: #fff !important;
+  border-radius: 10px;
+  padding: .35rem .5rem;
+}
+
+/* ✅ Dropdown de "Mostrar": opciones legibles (evita blanco/blanco) */
+.dataTables_wrapper .dataTables_length select{
+  background: rgba(17,17,17,.92) !important;
+  color: #fff !important;
+  border: 1px solid rgba(255,255,255,.18) !important;
+}
+.dataTables_wrapper .dataTables_length select option{
+  background: #111 !important;
+  color: #fff !important;
+}
+.dataTables_wrapper .dataTables_length select option:hover,
+.dataTables_wrapper .dataTables_length select option:checked{
+  background: rgba(255,255,255,.12) !important;
+  color: #fff !important;
+}
+
+/* ✅ Paginación más compacta */
+.dataTables_wrapper .dataTables_paginate{
+  margin-top: .75rem !important;
+  padding-top: .25rem !important;
+}
+
+.dataTables_wrapper .dataTables_paginate .paginate_button{
+  color: rgba(255,255,255,.85) !important;
+  border: 1px solid rgba(255,255,255,.12) !important;
+  background: rgba(255,255,255,.06) !important;
+  border-radius: 10px !important;
+  margin: 0 .15rem;
+
+  /* compacto */
+  padding: .25rem .55rem !important;
+  font-size: .90rem !important;
+  line-height: 1.1 !important;
+}
+
+/* Activo */
+.dataTables_wrapper .dataTables_paginate .paginate_button.current{
+  background: var(--bemore-orange) !important;
+  border-color: var(--bemore-orange) !important;
+  color: #0b0b0b !important;
+  font-weight: 800;
+}
+
+/* Hover */
+.dataTables_wrapper .dataTables_paginate .paginate_button:hover{
+  background: rgba(255,255,255,.10) !important;
+  color: #fff !important;
+}
+
+/* Bordes tabla */
+table.dataTable thead th{
+  border-bottom: 1px solid rgba(255,255,255,.18) !important;
+}
+table.dataTable.no-footer{
+  border-bottom: 1px solid rgba(255,255,255,.12) !important;
+}
+
+/* ✅ Evita que la paginación se pegue al scroll horizontal del table-responsive */
+.bemore-table-wrap{
+  padding-bottom: .75rem;
 }

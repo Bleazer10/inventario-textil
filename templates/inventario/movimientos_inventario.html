@@ -23,52 +23,32 @@
   <div class="card-header">Filtros</div>
   <div class="card-body">
     <form method="get" class="row g-2 align-items-end">
-      <div class="col-12 col-md-3">
-        <label class="form-label">Tipo</label>
-        <select name="tipo" class="form-control">
-          <option value="">Todos</option>
-          <option value="ENTRADA" {% if tipo == "ENTRADA" %}selected{% endif %}>Entrada</option>
-          <option value="SALIDA" {% if tipo == "SALIDA" %}selected{% endif %}>Salida</option>
-          <option value="AJUSTE" {% if tipo == "AJUSTE" %}selected{% endif %}>Ajuste</option>
-          <option value="TRASLADO" {% if tipo == "TRASLADO" %}selected{% endif %}>Traslado</option>
-        </select>
-      </div>
 
-      <div class="col-12 col-md-3">
-        <label class="form-label">Almacén</label>
-        <select name="almacen" class="form-control">
-          <option value="">Todos</option>
-          {% for a in almacenes %}
-            <option value="{{ a.id }}" {% if almacen_id|stringformat:"s" == a.id|stringformat:"s" %}selected{% endif %}>
-              {{ a.nombre }}
-            </option>
-          {% endfor %}
-        </select>
-      </div>
-
-      <div class="col-6 col-md-2">
+      <div class="col-12 col-md-3 col-lg-3">
         <label class="form-label">Desde</label>
         <input type="date" name="fi" class="form-control" value="{{ fi }}">
       </div>
 
-      <div class="col-6 col-md-2">
+      <div class="col-12 col-md-3 col-lg-3">
         <label class="form-label">Hasta</label>
         <input type="date" name="ff" class="form-control" value="{{ ff }}">
       </div>
 
-      <div class="col-12 col-md-2">
-        <label class="form-label">Buscar</label>
-        <input type="text" name="q" class="form-control" value="{{ q }}" placeholder="SKU, material...">
-      </div>
+      <!-- espacio flexible (para que botones queden pegados a la derecha en desktop) -->
+      <div class="d-none d-lg-block col-lg-2"></div>
 
-      <div class="col-12 d-flex gap-2 mt-2">
+      <div class="col-6 col-md-3 col-lg-2 d-grid">
         <button class="btn btn-bemore fw-bold" type="submit">
           <i class="fa-solid fa-filter me-2"></i> Aplicar
         </button>
+      </div>
+
+      <div class="col-6 col-md-3 col-lg-2 d-grid">
         <a class="btn btn-outline-light fw-bold" href="{% url 'movimientos_inventario' %}">
           Limpiar
         </a>
       </div>
+
     </form>
   </div>
 </div>
@@ -76,8 +56,8 @@
 <div class="card card-bemore">
   <div class="card-header">Listado</div>
   <div class="card-body">
-    <div class="table-responsive">
-      <table class="table table-bemore align-middle">
+    <div class="table-responsive bemore-table-wrap">
+      <table class="table table-bemore align-middle datatable-bemore">
         <thead>
           <tr>
             <th>Fecha/Hora</th>
@@ -111,13 +91,16 @@
               </td>
 
               <td class="text-end fw-bold">{{ m.cantidad }}</td>
+
               <td class="text-end">
                 {% if m.costo_unitario %}${{ m.costo_unitario }}{% else %}<span class="text-white-50">-</span>{% endif %}
               </td>
+
               <td class="text-white-50">
                 {% if m.referencia %}{{ m.referencia }}{% endif %}
                 {% if m.referencia_id %} #{{ m.referencia_id }}{% endif %}
               </td>
+
               <td class="text-white-50">{{ m.nota|default:"" }}</td>
             </tr>
           {% empty %}
@@ -127,10 +110,6 @@
           {% endfor %}
         </tbody>
       </table>
-    </div>
-
-    <div class="text-white-50 small mt-2">
-      Mostrando hasta 300 movimientos (luego añadimos paginación).
     </div>
   </div>
 </div>

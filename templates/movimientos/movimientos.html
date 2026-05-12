@@ -119,10 +119,10 @@
 
     <div class="tab-content">
 
-      <!-- INGRESOS -->
+      <!-- INGRESOS (✅ DataTables aquí) -->
       <div class="tab-pane fade show active" id="ingresos">
-        <div class="table-responsive">
-          <table class="table table-bemore align-middle">
+        <div class="table-responsive bemore-table-wrap">
+          <table class="table table-bemore align-middle datatable-bemore">
             <thead>
               <tr>
                 <th>ID</th>
@@ -149,10 +149,10 @@
         </div>
       </div>
 
-      <!-- EGRESOS -->
+      <!-- EGRESOS (✅ DataTables aquí) -->
       <div class="tab-pane fade" id="egresos">
-        <div class="table-responsive">
-          <table class="table table-bemore align-middle">
+        <div class="table-responsive bemore-table-wrap">
+          <table class="table table-bemore align-middle datatable-bemore">
             <thead>
               <tr>
                 <th>ID</th>
@@ -179,7 +179,7 @@
         </div>
       </div>
 
-      <!-- POR COBRAR -->
+      <!-- POR COBRAR (sin DataTables) -->
       <div class="tab-pane fade" id="porcobrar">
         <div class="d-flex justify-content-end mb-2">
           <a class="btn btn-sm btn-outline-light fw-bold" href="{% url 'lista_por_cobrar' %}">
@@ -216,7 +216,7 @@
         </div>
       </div>
 
-      <!-- POR PAGAR -->
+      <!-- POR PAGAR (sin DataTables) -->
       <div class="tab-pane fade" id="porpagar">
         <div class="row g-3">
           <div class="col-12 col-lg-6">
@@ -287,7 +287,7 @@
         </div>
       </div>
 
-      <!-- PAGOS -->
+      <!-- PAGOS (sin DataTables) -->
       <div class="tab-pane fade" id="pagos">
         <div class="table-responsive">
           <table class="table table-bemore align-middle">
