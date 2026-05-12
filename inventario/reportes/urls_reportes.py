@@ -15,4 +15,7 @@ urlpatterns = [
     path("existencias/", vr.reporte_existencias, name="reporte_existencias"),
     path("existencias/pdf/", vr.reporte_existencias_pdf, name="reporte_existencias_pdf"),
     path("existencias/excel/", vr.reporte_existencias_excel, name="reporte_existencias_excel"),
+    path("movimientos-inventario/", vr.reporte_movimientos_inventario, name="reporte_movimientos_inventario"),
+    path("movimientos-inventario/pdf/", vr.reporte_movimientos_inventario_pdf, name="reporte_movimientos_inventario_pdf"),
+    path("movimientos-inventario/excel/", vr.reporte_movimientos_inventario_excel, name="reporte_movimientos_inventario_excel"),
 ]

@@ -2,8 +2,8 @@ from django.contrib.auth.decorators import login_required
 from django.shortcuts import render
 from inventario.reportes.utils_pdf import pdf_tabla
 from inventario.reportes.utils_excel import excel_reporte
-from inventario.models import Venta, DetalleVenta, Compra, DetalleCompra, ItemInventario
-from datetime import datetime
+from inventario.models import Venta, DetalleVenta, Compra, DetalleCompra, ItemInventario, MovimientoInventario
+from datetime import datetime, timedelta, time
 from decimal import Decimal
 from django.db.models import Q, Sum, Min, Max, ExpressionWrapper, F, DecimalField, Case, When, Value
 from django.db.models.functions import Coalesce
@@ -473,7 +473,7 @@ def reporte_compras_pdf(request):
             c.proveedor.nombre,
             c.get_estado_display(),
             c.get_estado_pago_display(),
-            f"${c.total_compra}",
+             f"${c.total_compra.quantize(Decimal('0.01'))}",
         ])
 
     col_widths = [
@@ -831,7 +831,7 @@ def reporte_existencias_pdf(request):
         34*mm,  # SKU
         19*mm,  # Unidad (más pequeño)
         17*mm,  # Stock (más pequeño)
-        17*mm,  # Pto reorden (más pequeño)
+        19*mm,  # Pto reorden (más pequeño)
     ]
 
     # ✅ Multi-página: en páginas siguientes NO logo, solo líneas (repeat_header=True)
@@ -926,5 +926,319 @@ def reporte_existencias_excel(request):
         resumen=resumen,
         logo_relpath="img/logo-bemore.jpeg",
         nombre_empresa="BEMORE",
+        anchos=anchos,
+    )
+
+def _parse_date_ymd(s: str):
+    s = (s or "").strip()
+    if not s:
+        return None
+    try:
+        return datetime.strptime(s, "%Y-%m-%d").date()
+    except:
+        return None
+
+
+def _item_texto(m: MovimientoInventario):
+    """Devuelve (tipo_item, nombre, sku, unidad) para la fila."""
+    it = m.item
+    if it and it.tipo == ItemInventario.TipoItem.MATERIAL and it.material:
+        return ("Material", it.material.nombre, "", it.material.unidad)
+    if it and it.tipo == ItemInventario.TipoItem.PRODUCTO and it.variante_producto:
+        vp = it.variante_producto
+        nombre = f"{vp.producto.nombre} - {vp.nombre}"
+        return ("Producto terminado", nombre, vp.sku, "")
+    return ("—", "—", "", "")
+
+
+@login_required
+def reporte_movimientos_inventario(request):
+    tipo = (request.GET.get("tipo", "") or "").strip()     # ENTRADA/SALIDA/AJUSTE/TRASLADO
+    q = (request.GET.get("q", "") or "").strip()
+    fi = (request.GET.get("fi", "") or "").strip()
+    ff = (request.GET.get("ff", "") or "").strip()
+
+    hoy = timezone.localdate()
+    fi_date = _parse_date_ymd(fi) or (hoy - timedelta(days=30))
+    ff_date = _parse_date_ymd(ff) or hoy
+
+    inicio_dt = timezone.make_aware(datetime.combine(fi_date, time.min))
+    fin_dt = timezone.make_aware(datetime.combine(ff_date + timedelta(days=1), time.min))  # exclusivo
+
+    qs = (
+        MovimientoInventario.objects
+        .select_related(
+            "item",
+            "item__almacen",
+            "item__material",
+            "item__variante_producto",
+            "item__variante_producto__producto",
+        )
+        .filter(creado__gte=inicio_dt, creado__lt=fin_dt)
+        .order_by("-creado")
+    )
+
+    if tipo:
+        qs = qs.filter(tipo=tipo)
+
+    if q:
+        qs = qs.filter(
+            Q(item__material__nombre__icontains=q) |
+            Q(item__variante_producto__sku__icontains=q) |
+            Q(item__variante_producto__producto__nombre__icontains=q) |
+            Q(item__variante_producto__nombre__icontains=q) |
+            Q(referencia__icontains=q) |
+            Q(nota__icontains=q)
+        )
+
+    limite_vista = 500
+    movimientos = qs[:limite_vista]
+
+    # Resumen rápido (cantidad + totales por tipo)
+    agg = qs.aggregate(
+        entradas=Coalesce(Sum(Case(When(tipo="ENTRADA", then="cantidad"), default=Value(0), output_field=DecimalField())), Decimal("0.00")),
+        salidas=Coalesce(Sum(Case(When(tipo="SALIDA", then="cantidad"), default=Value(0), output_field=DecimalField())), Decimal("0.00")),
+        ajustes=Coalesce(Sum(Case(When(tipo="AJUSTE", then="cantidad"), default=Value(0), output_field=DecimalField())), Decimal("0.00")),
+    )
+
+    resumen = {
+        "cantidad": qs.count(),
+        "entradas": agg["entradas"].quantize(Decimal("0.01")),
+        "salidas": agg["salidas"].quantize(Decimal("0.01")),
+        "ajustes": agg["ajustes"].quantize(Decimal("0.01")),
+    }
+
+    return render(request, "reportes/movimientos_inventario.html", {
+        "movimientos": movimientos,
+        "limite_vista": limite_vista,
+        "tipo": tipo,
+        "q": q,
+        "fi": fi_date.strftime("%Y-%m-%d"),
+        "ff": ff_date.strftime("%Y-%m-%d"),
+        "tipo_choices": MovimientoInventario.TipoMovimiento.choices,
+        "resumen": resumen,
+    })
+
+
+@login_required
+def reporte_movimientos_inventario_pdf(request):
+    tipo = (request.GET.get("tipo", "") or "").strip()
+    q = (request.GET.get("q", "") or "").strip()
+    fi = (request.GET.get("fi", "") or "").strip()
+    ff = (request.GET.get("ff", "") or "").strip()
+
+    hoy = timezone.localdate()
+    fi_date = _parse_date_ymd(fi) or (hoy - timedelta(days=30))
+    ff_date = _parse_date_ymd(ff) or hoy
+
+    inicio_dt = timezone.make_aware(datetime.combine(fi_date, time.min))
+    fin_dt = timezone.make_aware(datetime.combine(ff_date + timedelta(days=1), time.min))
+
+    qs = (
+        MovimientoInventario.objects
+        .select_related(
+            "item",
+            "item__almacen",
+            "item__material",
+            "item__variante_producto",
+            "item__variante_producto__producto",
+        )
+        .filter(creado__gte=inicio_dt, creado__lt=fin_dt)
+        .order_by("-creado")
+    )
+
+    if tipo:
+        qs = qs.filter(tipo=tipo)
+
+    if q:
+        qs = qs.filter(
+            Q(item__material__nombre__icontains=q) |
+            Q(item__variante_producto__sku__icontains=q) |
+            Q(item__variante_producto__producto__nombre__icontains=q) |
+            Q(item__variante_producto__nombre__icontains=q) |
+            Q(referencia__icontains=q) |
+            Q(nota__icontains=q)
+        )
+
+    # ✅ Solo emisión (como te gusta)
+    fecha_emision = timezone.localdate()
+    periodo = f"Período: desde {fi_date.strftime('%d/%m/%Y')} al {ff_date.strftime('%d/%m/%Y')}"
+    filtros = [
+        periodo,
+        f"Fecha de emisión: {_fmt_fecha(fecha_emision)}",
+    ]
+
+    # Resumen simple
+    agg = qs.aggregate(
+        entradas=Coalesce(Sum(Case(When(tipo="ENTRADA", then="cantidad"), default=Value(0), output_field=DecimalField())), Decimal("0.00")),
+        salidas=Coalesce(Sum(Case(When(tipo="SALIDA", then="cantidad"), default=Value(0), output_field=DecimalField())), Decimal("0.00")),
+        ajustes=Coalesce(Sum(Case(When(tipo="AJUSTE", then="cantidad"), default=Value(0), output_field=DecimalField())), Decimal("0.00")),
+    )
+    resumen = [
+        ["Cantidad de movimientos", str(qs.count())],
+        ["Total entradas", str(agg["entradas"].quantize(Decimal("0.01")))],
+        ["Total salidas", str(agg["salidas"].quantize(Decimal("0.01")))],
+        ["Total ajustes", str(agg["ajustes"].quantize(Decimal("0.01")))],
+    ]
+
+    columnas = ["Fecha/Hora", "Tipo", "Ítem", "SKU", "Unidad", "Cant.", "Costo unit.", "Referencia"]
+
+    filas = []
+    for m in qs[:12000]:
+        tipo_item, nombre, sku, unidad = _item_texto(m)
+        ref = m.referencia or ""
+        if m.referencia_id:
+            ref = f"{ref} #{m.referencia_id}".strip()
+
+        filas.append([
+            timezone.localtime(m.creado).strftime("%d/%m/%Y %H:%M"),
+            m.get_tipo_display(),
+            nombre,
+            sku,
+            unidad,
+            float(m.cantidad),
+            "" if m.costo_unitario is None else f"${float(m.costo_unitario):.2f}",
+            ref,
+        ])
+
+    # Ajuste de anchos: Ítem más ancho, referencia amplia, números compactos
+    from reportlab.lib.units import mm
+    col_widths = [28*mm, 15*mm, 55*mm, 22*mm, 16*mm, 14*mm, 18*mm, 29*mm]
+
+    return pdf_tabla(
+        "reporte_movimientos_inventario",
+        "Reporte de Movimientos de Inventario",
+        None,
+        columnas,
+        filas,
+        resumen=resumen,
+        filtros=filtros,
+        titulo_datos=None,
+        repeat_header=True,       # ✅ multi página sin logo en páginas siguientes (tu util ya lo maneja)
+        col_widths=col_widths,
+        logo_relpath="img/logo-bemore.jpeg",
+        nombre_empresa="BEMORE",
+    )
+
+
+def _item_texto(m: MovimientoInventario):
+    it = m.item
+    if it and it.tipo == ItemInventario.TipoItem.MATERIAL and it.material:
+        return ("Material", it.material.nombre, "", it.material.unidad)
+    if it and it.tipo == ItemInventario.TipoItem.PRODUCTO and it.variante_producto:
+        vp = it.variante_producto
+        nombre = f"{vp.producto.nombre} - {vp.nombre}"
+        return ("Producto terminado", nombre, vp.sku, "")
+    return ("—", "—", "", "")
+
+@login_required
+def reporte_movimientos_inventario_excel(request):
+    tipo = (request.GET.get("tipo", "") or "").strip()
+    q = (request.GET.get("q", "") or "").strip()
+    fi = (request.GET.get("fi", "") or "").strip()
+    ff = (request.GET.get("ff", "") or "").strip()
+
+    hoy = timezone.localdate()
+    fi_date = _parse_date_ymd(fi) or (hoy - timedelta(days=30))
+    ff_date = _parse_date_ymd(ff) or hoy
+
+    inicio_dt = timezone.make_aware(datetime.combine(fi_date, time.min))
+    fin_dt = timezone.make_aware(datetime.combine(ff_date + timedelta(days=1), time.min))
+
+    # ✅ IMPORTANTE: NO hacer slice aquí
+    qs = (
+        MovimientoInventario.objects
+        .select_related(
+            "item",
+            "item__almacen",
+            "item__material",
+            "item__variante_producto",
+            "item__variante_producto__producto",
+        )
+        .filter(creado__gte=inicio_dt, creado__lt=fin_dt)
+        .order_by("-creado")
+    )
+
+    if tipo:
+        qs = qs.filter(tipo=tipo)
+
+    if q:
+        qs = qs.filter(
+            Q(item__material__nombre__icontains=q) |
+            Q(item__variante_producto__sku__icontains=q) |
+            Q(item__variante_producto__producto__nombre__icontains=q) |
+            Q(item__variante_producto__nombre__icontains=q) |
+            Q(referencia__icontains=q) |
+            Q(nota__icontains=q)
+        )
+
+    # ✅ Ahora sí: slice al final
+    qs = qs[:20000]
+
+    fecha_emision = timezone.localdate()
+    periodo = f"Período: desde {fi_date.strftime('%d/%m/%Y')} al {ff_date.strftime('%d/%m/%Y')}"
+    filtros = [
+        periodo,
+        f"Fecha de emisión: {_fmt_fecha(fecha_emision)}",
+    ]
+
+    agg = qs.aggregate(
+        entradas=Coalesce(Sum(Case(When(tipo="ENTRADA", then="cantidad"),
+                                  default=Value(0), output_field=DecimalField())), Decimal("0.00")),
+        salidas=Coalesce(Sum(Case(When(tipo="SALIDA", then="cantidad"),
+                                 default=Value(0), output_field=DecimalField())), Decimal("0.00")),
+        ajustes=Coalesce(Sum(Case(When(tipo="AJUSTE", then="cantidad"),
+                                 default=Value(0), output_field=DecimalField())), Decimal("0.00")),
+    )
+
+    resumen = [
+        ["Cantidad de movimientos", str(qs.count())],
+        ["Total entradas", str(agg["entradas"].quantize(Decimal("0.01")))],
+        ["Total salidas", str(agg["salidas"].quantize(Decimal("0.01")))],
+        ["Total ajustes", str(agg["ajustes"].quantize(Decimal("0.01")))],
+    ]
+
+    columnas = ["Fecha/Hora", "Tipo", "Ítem", "SKU", "Unidad", "Cantidad", "Costo unit.", "Referencia"]
+
+    filas = []
+    for m in qs:
+        _, nombre, sku, unidad = _item_texto(m)
+        ref = m.referencia or ""
+        if m.referencia_id:
+            ref = f"{ref} #{m.referencia_id}".strip()
+
+        filas.append([
+            timezone.localtime(m.creado).strftime("%d/%m/%Y %H:%M"),
+            m.get_tipo_display(),
+            nombre,
+            sku,
+            unidad,
+            float(m.cantidad),
+            "" if m.costo_unitario is None else float(m.costo_unitario),
+            ref,
+        ])
+
+    anchos = {
+        1: 25,
+        2: 12,
+        3: 40,
+        4: 16,
+        5: 12,
+        6: 12,
+        7: 14,
+        8: 28,
+    }
+
+    return excel_reporte(
+        nombre_archivo="reporte_movimientos_inventario",
+        hoja="Movimientos",
+        titulo="Movimientos de Inventario",
+        columnas=columnas,
+        filas=filas,
+        filtros=filtros,
+        resumen=resumen,
+        logo_relpath="img/logo-bemore.jpeg",
+        nombre_empresa="BEMORE",
+        formato_moneda_cols=[6],  # costo unit (index 6)
         anchos=anchos,
     )

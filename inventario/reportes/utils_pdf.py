@@ -244,14 +244,14 @@ def pdf_tabla(
                     r2.append("")
                 norm.append(r2)
 
-            tabla_filtros = Table(norm, colWidths=cw, hAlign="LEFT")
+            tabla_filtros = Table(norm, colWidths=cw, hAlign="CENTER")
             tabla_filtros.setStyle(TableStyle([
                 ("GRID", (0, 0), (-1, -1), 0.5, colors.grey),
                 ("BACKGROUND", (0, 0), (-1, -1), colors.white),
                 ("FONTNAME", (0, 0), (-1, -1), "Helvetica"),
                 ("FONTSIZE", (0, 0), (-1, -1), 9),
                 ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
-                ("ALIGN", (0, 0), (-1, -1), "LEFT"),
+                ("ALIGN", (0, 0), (-1, -1), "CENTER"),
                 ("LEFTPADDING", (0, 0), (-1, -1), 6),
                 ("RIGHTPADDING", (0, 0), (-1, -1), 6),
                 ("TOPPADDING", (0, 0), (-1, -1), 6),
@@ -274,7 +274,7 @@ def pdf_tabla(
             tabla_resumen = Table(
                 resumen,
                 colWidths=[180 * mm] * ncols,
-                hAlign="LEFT",
+                hAlign="CENTER",
             )
         else:
             ncols = max(len(r) for r in resumen)
@@ -288,7 +288,7 @@ def pdf_tabla(
             tabla_resumen = Table(
                 resumen,
                 colWidths=col_widths_resumen,
-                hAlign="LEFT",
+                hAlign="CENTER",
             )
 
         tabla_resumen.setStyle(TableStyle([
@@ -317,7 +317,7 @@ def pdf_tabla(
         col_width = ancho_total / total_cols
         col_widths = [col_width] * total_cols
 
-    tabla = Table(data, colWidths=col_widths, repeatRows=1, hAlign="LEFT")
+    tabla = Table(data, colWidths=col_widths, repeatRows=1, hAlign="CENTER")
     tabla.setStyle(TableStyle([
         ("BACKGROUND", (0, 0), (-1, 0), colors.lightgrey),
         ("TEXTCOLOR", (0, 0), (-1, 0), colors.black),
@@ -326,7 +326,7 @@ def pdf_tabla(
         ("FONTSIZE", (0, 0), (-1, -1), 8.5),
         ("GRID", (0, 0), (-1, -1), 0.4, colors.grey),
         ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
-        ("ALIGN", (0, 0), (-1, -1), "LEFT"),
+        ("ALIGN", (0, 0), (-1, -1), "CENTER"),
         ("LEFTPADDING", (0, 0), (-1, -1), 4),
         ("RIGHTPADDING", (0, 0), (-1, -1), 4),
         ("TOPPADDING", (0, 0), (-1, -1), 4),

@@ -117,8 +117,8 @@ def excel_reporte(
             ws[f"A{fila_actual}"].fill = fill_section
             ws[f"A{fila_actual}"].border = border
             ws[f"B{fila_actual}"].border = border
-            ws[f"A{fila_actual}"].alignment = Alignment(horizontal="left", vertical="center")
-            ws[f"B{fila_actual}"].alignment = Alignment(horizontal="left", vertical="center")
+            ws[f"A{fila_actual}"].alignment = Alignment(horizontal="center", vertical="center")
+            ws[f"B{fila_actual}"].alignment = Alignment(horizontal="center", vertical="center")
             fila_actual += 1
 
         fila_actual += 2
@@ -140,7 +140,7 @@ def excel_reporte(
         for col_idx, val in enumerate(r, start=1):
             c = ws.cell(row=fila_actual, column=col_idx, value=val)
             c.border = border
-            c.alignment = Alignment(horizontal="left", vertical="center")
+            c.alignment = Alignment(horizontal="center", vertical="center")
 
     fila_fin = fila_actual
 
@@ -155,7 +155,7 @@ def excel_reporte(
                 cell = ws.cell(row=row, column=col)
                 if isinstance(cell.value, (int, float)):
                     cell.number_format = '"$"#,##0.00'
-                cell.alignment = Alignment(horizontal="right", vertical="center")
+                cell.alignment = Alignment(horizontal="center", vertical="center")
 
     # ===== Anchos (personalizable) =====
     if anchos is None:
