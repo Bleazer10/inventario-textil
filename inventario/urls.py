@@ -82,4 +82,8 @@ urlpatterns = [
     
     path("finanzas/estadisticas/", views.estadisticas, name="estadisticas"),
     path("reportes/", include("inventario.reportes.urls_reportes")),
+
+    path("categorias-gasto/", views.lista_categorias_gasto, name="lista_categorias_gasto"),
+    path("categorias-gasto/nueva/", views.nueva_categoria_gasto, name="nueva_categoria_gasto"),
+    path("categorias-gasto/<int:categoria_id>/editar/", views.editar_categoria_gasto, name="editar_categoria_gasto"),
     ]

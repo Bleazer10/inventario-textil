@@ -1,0 +1,69 @@
+{% extends "base.html" %}
+
+{% block titulo %}
+  {% if modo == "editar" %}Editar categoría{% else %}Nueva categoría{% endif %}
+{% endblock %}
+
+{% block breadcrumbs %}
+<nav aria-label="breadcrumb">
+  <ol class="breadcrumb">
+    <li class="breadcrumb-item"><a href="{% url 'dashboard' %}"><i class="fa-solid fa-home"></i></a></li>
+    <li class="breadcrumb-item"><a href="{% url 'lista_categorias_gasto' %}">Categorías de gasto</a></li>
+    <li class="breadcrumb-item active">
+      {% if modo == "editar" %}Editar{% else %}Nueva{% endif %}
+    </li>
+  </ol>
+</nav>
+{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <div>
+    <h2 class="fw-black mb-0">
+      {% if modo == "editar" %}Editar categoría{% else %}Nueva categoría{% endif %}
+    </h2>
+    <div class="text-white-50">Estas categorías se usan al registrar un gasto.</div>
+  </div>
+</div>
+
+<div class="row justify-content-center">
+  <div class="col-12 col-lg-7">
+    <div class="card card-bemore">
+      <div class="card-header">
+        <i class="fa-solid fa-tag me-2"></i>
+        {% if modo == "editar" %}Editar{% else %}Crear{% endif %} categoría
+      </div>
+      <div class="card-body p-4">
+        <form method="post" novalidate>
+          {% csrf_token %}
+
+          <div class="mb-3">
+            <label class="form-label">Nombre</label>
+            {{ form.nombre }}
+            {% if form.nombre.errors %}
+              <div class="text-danger small mt-1">{{ form.nombre.errors }}</div>
+            {% endif %}
+          </div>
+
+          <div class="form-check mb-4">
+            {{ form.activa }}
+            <label class="form-check-label">Activa</label>
+          </div>
+
+          <div class="d-flex gap-2">
+            <button class="btn btn-bemore fw-bold flex-fill" type="submit">
+              <i class="fa-solid fa-floppy-disk me-2"></i>
+              {% if modo == "editar" %}Guardar cambios{% else %}Guardar categoría{% endif %}
+            </button>
+
+            <a href="{% url 'lista_categorias_gasto' %}" class="btn btn-outline-light fw-bold flex-fill">
+              <i class="fa-solid fa-arrow-left me-2"></i> Volver
+            </a>
+          </div>
+
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

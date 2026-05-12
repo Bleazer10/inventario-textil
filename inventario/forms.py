@@ -1,5 +1,5 @@
 from django import forms
-from .models import CategoriaProducto, Producto, VarianteProducto, CategoriaMaterial, Material, Almacen, ItemInventario, Cliente, Proveedor, DetalleFormula, Formula, LoteProduccion
+from .models import CategoriaProducto, Producto, VarianteProducto, CategoriaMaterial, Material, Almacen, ItemInventario, Cliente, Proveedor, DetalleFormula, Formula, LoteProduccion, CategoriaGasto
 
 class ProductoForm(forms.ModelForm):
     class Meta:
@@ -122,3 +122,12 @@ class LoteProduccionForm(forms.ModelForm):
             "costo_indirecto_real",
             "notas",
         ]
+
+class CategoriaGastoForm(forms.ModelForm):
+    class Meta:
+        model = CategoriaGasto
+        fields = ["nombre", "activa"]
+        widgets = {
+            "nombre": forms.TextInput(attrs={"class": "form-control", "placeholder": "Ej: Transporte, Servicios..."}),
+            "activa": forms.CheckboxInput(attrs={"class": "form-check-input"}),
+        }

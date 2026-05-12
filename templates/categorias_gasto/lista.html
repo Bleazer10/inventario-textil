@@ -1,0 +1,76 @@
+{% extends "base.html" %}
+
+{% block titulo %}Categorías de gasto{% endblock %}
+
+{% block breadcrumbs %}
+<nav aria-label="breadcrumb">
+  <ol class="breadcrumb">
+    <li class="breadcrumb-item"><a href="{% url 'dashboard' %}"><i class="fa-solid fa-home"></i></a></li>
+    <li class="breadcrumb-item active">Categorías de gasto</li>
+  </ol>
+</nav>
+{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <div>
+    <h2 class="fw-black mb-0">Categorías de gasto</h2>
+    <div class="text-white-50">Administra las categorías usadas en “Nuevo gasto”.</div>
+  </div>
+
+  <a class="btn btn-bemore fw-bold" href="{% url 'nueva_categoria_gasto' %}">
+    <i class="fa-solid fa-plus me-2"></i> Nueva categoría
+  </a>
+</div>
+
+<div class="card card-bemore mb-3">
+  <div class="card-header">Buscar</div>
+  <div class="card-body">
+    <form method="get" class="row g-2 align-items-end">
+      <div class="col-12 col-md-10">
+        <label class="form-label">Nombre</label>
+        <input type="text" name="q" class="form-control" value="{{ q }}" placeholder="Ej: Transporte, Servicios...">
+      </div>
+      <div class="col-12 col-md-2 d-grid">
+        <button class="btn btn-outline-light fw-bold" type="submit">Buscar</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<div class="card card-bemore">
+  <div class="card-header">Listado</div>
+  <div class="card-body table-responsive">
+    <table class="table table-bemore align-middle">
+      <thead>
+        <tr>
+          <th>Nombre</th>
+          <th class="text-end">Estado</th>
+          <th class="text-end"></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for c in categorias %}
+          <tr>
+            <td class="fw-bold">{{ c.nombre }}</td>
+            <td class="text-end">
+              {% if c.activa %}
+                <span class="badge text-bg-success">Activa</span>
+              {% else %}
+                <span class="badge text-bg-secondary">Inactiva</span>
+              {% endif %}
+            </td>
+            <td class="text-end">
+              <a class="btn btn-sm btn-outline-light" href="{% url 'editar_categoria_gasto' c.id %}">
+                <i class="fa-solid fa-pen me-1"></i> Editar
+              </a>
+            </td>
+          </tr>
+        {% empty %}
+          <tr><td colspan="3" class="text-white-50">No hay categorías.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

@@ -18,7 +18,7 @@ from .forms import (
     CategoriaMaterialForm,
     MaterialForm,
     AlmacenForm,
-    ItemInventarioForm,
+    ItemInventarioForm,CategoriaGastoForm,
     AjusteInventarioForm, ClienteForm, ProveedorForm, DetalleFormulaForm, FormulaForm, LoteProduccionForm
 )
 
@@ -2074,4 +2074,56 @@ def estadisticas(request):
         # Tablas
         "top_productos": top_productos,
         "gastos_por_categoria": gastos_por_categoria,
+    })
+
+@login_required
+def lista_categorias_gasto(request):
+    q = request.GET.get("q", "").strip()
+    categorias = CategoriaGasto.objects.all().order_by("nombre")
+
+    if q:
+        categorias = categorias.filter(nombre__icontains=q)
+
+    return render(request, "categorias_gasto/lista.html", {
+        "categorias": categorias,
+        "q": q,
+    })
+
+
+@login_required
+def nueva_categoria_gasto(request):
+    if request.method == "POST":
+        form = CategoriaGastoForm(request.POST)
+        if form.is_valid():
+            form.save()
+            messages.success(request, "Categoría de gasto creada correctamente.")
+            return redirect("lista_categorias_gasto")
+        messages.error(request, "Revisa los datos del formulario.")
+    else:
+        form = CategoriaGastoForm()
+
+    return render(request, "categorias_gasto/form.html", {
+        "form": form,
+        "modo": "nueva",
+    })
+
+
+@login_required
+def editar_categoria_gasto(request, categoria_id):
+    categoria = get_object_or_404(CategoriaGasto, id=categoria_id)
+
+    if request.method == "POST":
+        form = CategoriaGastoForm(request.POST, instance=categoria)
+        if form.is_valid():
+            form.save()
+            messages.success(request, "Categoría de gasto actualizada correctamente.")
+            return redirect("lista_categorias_gasto")
+        messages.error(request, "Revisa los datos del formulario.")
+    else:
+        form = CategoriaGastoForm(instance=categoria)
+
+    return render(request, "categorias_gasto/form.html", {
+        "form": form,
+        "modo": "editar",
+        "categoria": categoria,
     })
