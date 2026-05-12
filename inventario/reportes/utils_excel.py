@@ -18,6 +18,7 @@ def excel_reporte(
     logo_relpath: str = "img/logo-bemore.jpeg",
     nombre_empresa: str = "BEMORE",
     formato_moneda_cols: list = None,  # indices 0-based columnas dinero
+    anchos=None,  # ✅ permite anchos personalizados por reporte
 ):
     wb = Workbook()
     ws = wb.active
@@ -38,7 +39,7 @@ def excel_reporte(
     thin = Side(style="thin", color="BDBDBD")
     border = Border(left=thin, right=thin, top=thin, bottom=thin)
 
-    # ===== Logo (más grande) =====
+    # ===== Logo =====
     logo_path = finders.find(logo_relpath)
     if logo_path:
         try:
@@ -49,8 +50,7 @@ def excel_reporte(
         except:
             pass
 
-    # ===== Encabezado SIMPLE (como antes, no centrado) =====
-    # DESPUÉS (mejor, no se monta con el logo)
+    # ===== Encabezado simple =====
     ws["B1"] = nombre_empresa
     ws["B1"].font = company_font
     ws["B1"].alignment = Alignment(horizontal="left", vertical="center")
@@ -64,7 +64,7 @@ def excel_reporte(
 
     fila_actual = 5
 
-    # ===== Filtros (solo si hay algo) =====
+    # ===== Filtros (solo si hay) =====
     filtros_visibles = []
     if filtros:
         for f in filtros:
@@ -88,7 +88,7 @@ def excel_reporte(
             if len(row) == 1:
                 texto = row[0]
                 ws[f"A{fila_actual}"] = texto
-                ws.merge_cells(start_row=fila_actual, start_column=1, end_row=fila_actual, end_column=len(columnas))
+                ws.merge_cells(start_row=fila_actual, start_column=1, end_row=fila_actual, end_column=last_col)
                 ws[f"A{fila_actual}"].fill = fill_section
                 ws[f"A{fila_actual}"].border = border
                 ws[f"A{fila_actual}"].alignment = Alignment(horizontal="left", vertical="center", wrap_text=True)
@@ -99,11 +99,13 @@ def excel_reporte(
                 ws[f"A{fila_actual}"].fill = fill_section
                 ws[f"A{fila_actual}"].border = border
                 ws[f"B{fila_actual}"].border = border
+                ws[f"A{fila_actual}"].alignment = Alignment(horizontal="left", vertical="center")
+                ws[f"B{fila_actual}"].alignment = Alignment(horizontal="left", vertical="center")
             fila_actual += 1
 
         fila_actual += 1
 
-    # ===== Resumen (como antes, no centrado) =====
+    # ===== Resumen =====
     if resumen:
         ws[f"A{fila_actual}"] = "Resumen"
         ws[f"A{fila_actual}"].font = bold
@@ -115,6 +117,8 @@ def excel_reporte(
             ws[f"A{fila_actual}"].fill = fill_section
             ws[f"A{fila_actual}"].border = border
             ws[f"B{fila_actual}"].border = border
+            ws[f"A{fila_actual}"].alignment = Alignment(horizontal="left", vertical="center")
+            ws[f"B{fila_actual}"].alignment = Alignment(horizontal="left", vertical="center")
             fila_actual += 1
 
         fila_actual += 2
@@ -122,7 +126,6 @@ def excel_reporte(
     # ===== Tabla principal =====
     fila_header = fila_actual
 
-    # Encabezados
     for col_idx, col_name in enumerate(columnas, start=1):
         cell = ws.cell(row=fila_header, column=col_idx, value=col_name)
         cell.font = header_font
@@ -132,7 +135,6 @@ def excel_reporte(
 
     ws.row_dimensions[fila_header].height = 20
 
-    # Datos
     for r in filas:
         fila_actual += 1
         for col_idx, val in enumerate(r, start=1):
@@ -142,13 +144,10 @@ def excel_reporte(
 
     fila_fin = fila_actual
 
-    # Congelar encabezado (esto sí es útil y no pone flechas)
+    # Freeze header
     ws.freeze_panes = ws[f"A{fila_header+1}"]
 
-    # ✅ QUITAR AUTO-FILTER (esto elimina la flecha gris)
-    # ws.auto_filter.ref = f"A{fila_header}:{last_col_letter}{fila_fin}"  <-- NO
-
-    # Formato moneda (alineado derecha)
+    # Formato moneda
     if formato_moneda_cols:
         for col0 in formato_moneda_cols:
             col = col0 + 1
@@ -158,22 +157,22 @@ def excel_reporte(
                     cell.number_format = '"$"#,##0.00'
                 cell.alignment = Alignment(horizontal="right", vertical="center")
 
-    # ===== Anchos fijos buenos (sin locuras) =====
-    # Ajusta si quieres, pero estos ya quedan bien para ventas.
-    anchos = {
-        1: 20,   # #Venta
-        2: 14,  # Fecha
-        3: 24,  # Cliente
-        4: 12,  # Tipo pago
-        5: 12,  # Total
-        6: 12,  # Pagado
-        7: 12,  # Saldo
-        8: 14,  # Estado
-    }
+    # ===== Anchos (personalizable) =====
+    if anchos is None:
+        anchos = {
+            1: 20,
+            2: 14,
+            3: 24,
+            4: 12,
+            5: 12,
+            6: 12,
+            7: 12,
+            8: 14,
+        }
+
     for col in range(1, last_col + 1):
         ws.column_dimensions[get_column_letter(col)].width = anchos.get(col, 16)
 
-    # ===== Respuesta HTTP =====
     response = HttpResponse(
         content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
     )

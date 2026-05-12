@@ -1,0 +1,107 @@
+{% extends "base.html" %}
+{% block titulo %}Reporte de Existencias{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <div>
+    <h2 class="fw-black mb-1">Reporte de Existencias</h2>
+    <div class="text-white-50">Inventario actual (Materiales y Productos terminados).</div>
+  </div>
+</div>
+
+<!-- ✅ Filtros en una sola línea (desktop) + botones más grandes -->
+<form method="get" class="row g-2 align-items-end mb-2">
+  <div class="col-12 col-md-3 col-lg-3">
+    <label class="form-label">Tipo</label>
+    <select name="tipo" class="form-control">
+      <option value="">Todos</option>
+      {% for val, label in tipo_choices %}
+        <option value="{{ val }}" {% if tipo == val %}selected{% endif %}>{{ label }}</option>
+      {% endfor %}
+    </select>
+  </div>
+
+  <!-- ✅ Buscar más pequeño -->
+  <div class="col-12 col-md-6 col-lg-5">
+    <label class="form-label">Buscar</label>
+    <input type="text" name="q" class="form-control" value="{{ q }}" placeholder="Material, SKU, producto o variante">
+  </div>
+
+  <!-- ✅ Botones más grandes -->
+  <div class="col-6 col-md-1 col-lg-2 d-grid">
+    <button class="btn btn-outline-light fw-bold px-4" type="submit">Aplicar</button>
+  </div>
+
+  <div class="col-6 col-md-2 col-lg-2 d-grid">
+    <a class="btn btn-outline-light fw-bold px-4" href="{% url 'reporte_existencias' %}">Limpiar</a>
+  </div>
+</form>
+
+<div class="d-flex gap-2 mb-3 flex-wrap">
+  <a class="btn btn-bemore fw-bold"
+     href="{% url 'reporte_existencias_pdf' %}?tipo={{ tipo }}&q={{ q|urlencode }}">
+    Exportar PDF
+  </a>
+  <a class="btn btn-outline-light fw-bold"
+     href="{% url 'reporte_existencias_excel' %}?tipo={{ tipo }}&q={{ q|urlencode }}">
+    Exportar Excel
+  </a>
+</div>
+
+{% if resumen %}
+  <div class="row g-3 mb-3">
+    <div class="col-md-4">
+      <div class="card card-bemore p-3">
+        <div class="text-white-50">Cantidad de ítems</div>
+        <div class="fs-4 fw-black">{{ resumen.cantidad }}</div>
+      </div>
+    </div>
+    <div class="col-md-8">
+      <div class="card card-bemore p-3">
+        <div class="text-white-50">Stock total (suma)</div>
+        <div class="fs-4 fw-black">{{ resumen.total_stock }}</div>
+      </div>
+    </div>
+  </div>
+{% endif %}
+
+<div class="card card-bemore">
+  <div class="card-header">Vista previa (últimas {{ limite_vista|default:"500" }})</div>
+  <div class="card-body table-responsive">
+    <table class="table table-bemore align-middle">
+      <thead>
+        <tr>
+          <th>Tipo</th>
+          <th>Nombre</th>
+          <th>SKU</th>
+          <th>Unidad</th>
+          <th>Stock</th>
+          <th>Pto reorden</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for it in items %}
+        <tr>
+          <td>{{ it.get_tipo_display }}</td>
+
+          {% if it.tipo == "MATERIAL" and it.material %}
+            <td>{{ it.material.nombre }}</td>
+            <td class="text-white-50">—</td>
+            <td>{{ it.material.unidad }}</td>
+          {% else %}
+            <td>{{ it.variante_producto.producto.nombre }} - {{ it.variante_producto.nombre }}</td>
+            <td>{{ it.variante_producto.sku }}</td>
+            <td class="text-white-50">—</td>
+          {% endif %}
+
+          <td class="fw-bold">{{ it.stock }}</td>
+          <td>{{ it.punto_reorden }}</td>
+        </tr>
+        {% empty %}
+        <tr><td colspan="6" class="text-white-50">No hay ítems para ese filtro.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

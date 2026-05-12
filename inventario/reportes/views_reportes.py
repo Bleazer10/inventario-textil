@@ -2,10 +2,10 @@ from django.contrib.auth.decorators import login_required
 from django.shortcuts import render
 from inventario.reportes.utils_pdf import pdf_tabla
 from inventario.reportes.utils_excel import excel_reporte
-from inventario.models import Venta, DetalleVenta, Compra, DetalleCompra
+from inventario.models import Venta, DetalleVenta, Compra, DetalleCompra, ItemInventario
 from datetime import datetime
 from decimal import Decimal
-from django.db.models import Q, Sum, Min, Max, ExpressionWrapper, F, DecimalField
+from django.db.models import Q, Sum, Min, Max, ExpressionWrapper, F, DecimalField, Case, When, Value
 from django.db.models.functions import Coalesce
 from django.shortcuts import get_object_or_404
 from reportlab.lib.units import mm
@@ -698,4 +698,233 @@ def reporte_compra_factura_excel(request, compra_id):
         logo_relpath="img/logo-bemore.jpeg",
         nombre_empresa="BEMORE",
         formato_moneda_cols=[3, 4],
+    )
+
+def _stock_annotation():
+    # Stock = entradas + ajustes - salidas
+    return Coalesce(
+        Sum(
+            Case(
+                When(movimientos__tipo="SALIDA", then=F("movimientos__cantidad") * Value(Decimal("-1"))),
+                When(movimientos__tipo="ENTRADA", then=F("movimientos__cantidad")),
+                When(movimientos__tipo="AJUSTE", then=F("movimientos__cantidad")),
+                default=Value(Decimal("0.00")),
+                output_field=DecimalField(max_digits=12, decimal_places=2),
+            )
+        ),
+        Value(Decimal("0.00")),
+    )
+
+@login_required
+def reporte_existencias(request):
+    tipo = (request.GET.get("tipo", "") or "").strip()      # MATERIAL / PRODUCTO / ""
+    q = (request.GET.get("q", "") or "").strip()
+
+    items = (
+        ItemInventario.objects
+        .select_related(
+            "almacen",
+            "material", "material__categoria",
+            "variante_producto", "variante_producto__producto"
+        )
+        .filter(activo=True)
+        .annotate(stock=_stock_annotation())
+        .order_by("tipo", "almacen__nombre")
+    )
+
+    if tipo:
+        items = items.filter(tipo=tipo)
+
+    if q:
+        items = items.filter(
+            Q(material__nombre__icontains=q) |
+            Q(variante_producto__sku__icontains=q) |
+            Q(variante_producto__producto__nombre__icontains=q) |
+            Q(variante_producto__nombre__icontains=q)
+        )
+
+    limite_vista = 500
+    lista = items[:limite_vista]
+
+    # Resumen simple
+    resumen = {
+        "cantidad": items.count(),
+        "total_stock": items.aggregate(s=Coalesce(Sum("stock"), Decimal("0.00")))["s"].quantize(Decimal("0.01")),
+    }
+
+    return render(request, "reportes/existencias.html", {
+        "items": lista,
+        "tipo": tipo,
+        "q": q,
+        "limite_vista": limite_vista,
+        "resumen": resumen,
+        "tipo_choices": ItemInventario.TipoItem.choices,
+    })
+
+
+@login_required
+def reporte_existencias_pdf(request):
+    tipo = (request.GET.get("tipo", "") or "").strip()
+    q = (request.GET.get("q", "") or "").strip()
+
+    items = (
+        ItemInventario.objects
+        .select_related(
+            "almacen",
+            "material", "material__categoria",
+            "variante_producto", "variante_producto__producto"
+        )
+        .filter(activo=True)
+        .annotate(stock=_stock_annotation())
+        .order_by("tipo", "almacen__nombre")
+    )
+
+    if tipo:
+        items = items.filter(tipo=tipo)
+
+    if q:
+        items = items.filter(
+            Q(material__nombre__icontains=q) |
+            Q(variante_producto__sku__icontains=q) |
+            Q(variante_producto__producto__nombre__icontains=q) |
+            Q(variante_producto__nombre__icontains=q)
+        )
+
+    # ✅ Emisión (y nada más, como te gusta en reportes generales)
+    fecha_emision = timezone.localdate()
+    filtros = [f"Fecha de emisión: {_fmt_fecha(fecha_emision)}"]
+
+    # Resumen
+    total_stock = items.aggregate(s=Coalesce(Sum("stock"), Decimal("0.00")))["s"]
+    resumen = [
+        ["Cantidad de ítems", str(items.count())],
+        ["Stock total (suma)", f"{total_stock.quantize(Decimal('0.01'))}"],
+    ]
+
+    columnas = ["Tipo", "Nombre", "SKU", "Unidad", "Stock", "Pto reorden"]
+
+    filas = []
+    for it in items[:8000]:
+        if it.tipo == ItemInventario.TipoItem.MATERIAL and it.material:
+            nombre = it.material.nombre
+            sku = ""
+            unidad = it.material.unidad
+        else:
+            # PRODUCTO
+            vp = it.variante_producto
+            nombre = f"{vp.producto.nombre} - {vp.nombre}" if vp else ""
+            sku = vp.sku if vp else ""
+            unidad = ""
+
+        filas.append([
+            it.get_tipo_display(),
+            nombre,
+            sku,
+            unidad,
+            round(float(it.stock), 2),
+            round(float(it.punto_reorden), 2),
+        ])
+
+    col_widths = [
+        32*mm,  # Tipo (un poquito)
+        57*mm,  # Nombre ✅ más ancho
+        34*mm,  # SKU
+        19*mm,  # Unidad (más pequeño)
+        17*mm,  # Stock (más pequeño)
+        17*mm,  # Pto reorden (más pequeño)
+    ]
+
+    # ✅ Multi-página: en páginas siguientes NO logo, solo líneas (repeat_header=True)
+    return pdf_tabla(
+        "reporte_existencias",
+        "Reporte de Existencias",
+        None,
+        columnas,
+        filas,
+        resumen=resumen,
+        filtros=filtros,
+        titulo_datos=None,
+        repeat_header=True,
+        col_widths=col_widths,
+        logo_relpath="img/logo-bemore.jpeg",
+        nombre_empresa="BEMORE",
+    )
+
+
+@login_required
+def reporte_existencias_excel(request):
+    tipo = (request.GET.get("tipo", "") or "").strip()
+    q = (request.GET.get("q", "") or "").strip()
+
+    items = (
+        ItemInventario.objects
+        .select_related(
+            "almacen",
+            "material", "material__categoria",
+            "variante_producto", "variante_producto__producto"
+        )
+        .filter(activo=True)
+        .annotate(stock=_stock_annotation())
+        .order_by("tipo", "almacen__nombre")[:20000]
+    )
+
+    if tipo:
+        items = items.filter(tipo=tipo)
+
+    if q:
+        items = items.filter(
+            Q(material__nombre__icontains=q) |
+            Q(variante_producto__sku__icontains=q) |
+            Q(variante_producto__producto__nombre__icontains=q) |
+            Q(variante_producto__nombre__icontains=q)
+        )
+
+
+
+    fecha_emision = timezone.localdate()
+    filtros = [f"Fecha de emisión: {fecha_emision.strftime('%d/%m/%Y')}"]
+
+    total_stock = items.aggregate(s=Coalesce(Sum("stock"), Decimal("0.00")))["s"]
+    resumen = [
+        ["Cantidad de ítems", str(items.count())],
+        ["Stock total (suma)", str(total_stock.quantize(Decimal("0.01")))],
+    ]
+
+    columnas = ["Tipo", "Nombre", "SKU", "Unidad", "Stock", "Pto reorden"]
+
+    filas = []
+    for it in items:
+        if it.tipo == ItemInventario.TipoItem.MATERIAL and it.material:
+            nombre = it.material.nombre
+            sku = ""
+            unidad = it.material.unidad
+        else:
+            vp = it.variante_producto
+            nombre = f"{vp.producto.nombre} - {vp.nombre}" if vp else ""
+            sku = vp.sku if vp else ""
+            unidad = ""
+
+        filas.append([
+            it.get_tipo_display(),
+            nombre,
+            sku,
+            unidad,
+            float(it.stock),
+            float(it.punto_reorden),
+        ])
+
+    # anchos (Nombre más ancho)
+    anchos = {1: 28, 2: 40, 3: 16, 4: 14, 5: 12, 6: 14}
+
+    return excel_reporte(
+        nombre_archivo="reporte_existencias",
+        hoja="Existencias",
+        titulo="Reporte de Existencias",
+        columnas=columnas,
+        filas=filas,
+        filtros=filtros,
+        resumen=resumen,
+        logo_relpath="img/logo-bemore.jpeg",
+        nombre_empresa="BEMORE",
+        anchos=anchos,
     )

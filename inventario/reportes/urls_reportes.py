@@ -12,4 +12,7 @@ urlpatterns = [
     path("compras/excel/", vr.reporte_compras_excel, name="reporte_compras_excel"),
     path("compras/<int:compra_id>/pdf/", vr.reporte_compra_factura_pdf, name="reporte_compra_factura_pdf"),
     path("compras/<int:compra_id>/excel/", vr.reporte_compra_factura_excel, name="reporte_compra_factura_excel"),
+    path("existencias/", vr.reporte_existencias, name="reporte_existencias"),
+    path("existencias/pdf/", vr.reporte_existencias_pdf, name="reporte_existencias_pdf"),
+    path("existencias/excel/", vr.reporte_existencias_excel, name="reporte_existencias_excel"),
 ]
