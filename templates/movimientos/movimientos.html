@@ -28,11 +28,20 @@
       <a class="btn {% if filtro == 'semana' %}btn-bemore{% else %}btn-outline-light{% endif %} fw-bold" href="?filtro=semana">Semana</a>
       <a class="btn {% if filtro == 'mes' %}btn-bemore{% else %}btn-outline-light{% endif %} fw-bold" href="?filtro=mes">Mes</a>
 
-      <form class="d-flex gap-2 ms-auto" method="get">
+      <form class="d-flex gap-2 ms-auto align-items-center" method="get">
         <input type="hidden" name="filtro" value="rango">
-        <input type="date" name="fi" class="form-control" value="{{ fecha_inicio|date:'Y-m-d' }}">
-        <input type="date" name="ff" class="form-control" value="{{ fecha_fin|date:'Y-m-d' }}">
-        <button class="btn btn-outline-light fw-bold" type="submit">
+
+        <input type="date" name="fi"
+              class="form-control form-control-sm"
+              style="width: 195px;"
+              value="{{ fecha_inicio|date:'Y-m-d' }}">
+
+        <input type="date" name="ff"
+              class="form-control form-control-sm"
+              style="width: 195px;"
+              value="{{ fecha_fin|date:'Y-m-d' }}">
+
+        <button class="btn btn-sm btn-outline-light fw-bold px-3" type="submit">
           <i class="fa-solid fa-filter me-2"></i> Filtrar
         </button>
       </form>
@@ -80,7 +89,7 @@
   <div class="card-header">Registros</div>
   <div class="card-body">
 
-    <ul class="nav nav-tabs mb-3" role="tablist">
+    <ul class="nav nav-tabs nav-bemore-tabs mb-3" role="tablist">
       <li class="nav-item" role="presentation">
         <button class="nav-link active" data-bs-toggle="tab" data-bs-target="#ingresos" type="button">
           Ingresos (Ventas)

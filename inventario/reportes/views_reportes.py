@@ -273,8 +273,8 @@ def reporte_venta_factura_pdf(request, venta_id):
     # Anchos personalizados (Producto más ancho)
     col_widths = [
         22 * mm,  # SKU
-        60 * mm,  # Producto  ✅ más ancho
-        35 * mm,  # Variante
+        50 * mm,  # Producto  ✅ más ancho
+        30 * mm,  # Variante
         16 * mm,  # Cant
         20 * mm,  # Precio
         20 * mm,  # Desc
@@ -1103,7 +1103,7 @@ def reporte_movimientos_inventario_pdf(request):
 
     # Ajuste de anchos: Ítem más ancho, referencia amplia, números compactos
     from reportlab.lib.units import mm
-    col_widths = [28*mm, 15*mm, 55*mm, 22*mm, 16*mm, 14*mm, 18*mm, 29*mm]
+    col_widths = [25*mm, 13*mm, 50*mm, 20*mm, 13*mm, 13*mm, 17*mm, 26*mm]
 
     return pdf_tabla(
         "reporte_movimientos_inventario",

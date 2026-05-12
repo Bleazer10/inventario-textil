@@ -4,7 +4,7 @@ from django.http import HttpResponse
 from django.contrib.staticfiles import finders
 
 from reportlab.lib import colors
-from reportlab.lib.pagesizes import A4, landscape
+from reportlab.lib.pagesizes import A4
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib.enums import TA_CENTER, TA_LEFT
 from reportlab.lib.units import mm
@@ -31,20 +31,24 @@ def pdf_tabla(
 
     # ✅ NUEVOS
     titulo_datos=None,                 # None = no mostrar título
-    col_widths=None,                    # lista de anchos para tabla principal
-    resumen_en_una_linea=False,         # True = resumen en una fila (caja única)
-    repeat_header=False,                # True = repetir header con filtros en páginas adicionales
+    col_widths=None,                   # lista de anchos para tabla principal
+    resumen_en_una_linea=False,        # True = resumen en una fila (caja única)
+    repeat_header=False,               # True = repetir header con filtros en páginas adicionales
 ):
     buffer = BytesIO()
 
+    # ✅ Márgenes seguros para impresión (en mm)
     doc = SimpleDocTemplate(
         buffer,
         pagesize=A4,
-        rightMargin=18,
-        leftMargin=18,
-        topMargin=18,
-        bottomMargin=18,
+        leftMargin=15 * mm,
+        rightMargin=15 * mm,
+        topMargin= 25 * mm,
+        bottomMargin=18 * mm,
     )
+
+    # ✅ Ancho útil real de la página (evita que se mochen tablas)
+    ancho_util = doc.width
 
     styles = getSampleStyleSheet()
 
@@ -108,7 +112,7 @@ def pdf_tabla(
     elementos = []
 
     # =========================================================
-    # 1) ENCABEZADO: LOGO A LA IZQUIERDA + BEMORE AL LADO
+    # 1) ENCABEZADO: LOGO A LA IZQUIERDA + EMPRESA AL LADO
     # =========================================================
     logo = None
     if logo_relpath:
@@ -118,10 +122,10 @@ def pdf_tabla(
 
     if logo:
         encabezado_data = [[logo, Paragraph(nombre_empresa, style_empresa)]]
-        encabezado = Table(encabezado_data, colWidths=[34 * mm, 140 * mm])
+        encabezado = Table(encabezado_data, colWidths=[34 * mm, ancho_util - (34 * mm)])
     else:
         encabezado_data = [[Paragraph(nombre_empresa, style_empresa)]]
-        encabezado = Table(encabezado_data, colWidths=[174 * mm])
+        encabezado = Table(encabezado_data, colWidths=[ancho_util])
 
     encabezado.setStyle(TableStyle([
         ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
@@ -136,13 +140,13 @@ def pdf_tabla(
     elementos.append(Spacer(1, 12))
 
     # =========================================================
-    # 2) TITULO DEL REPORTE
+    # 2) TÍTULO
     # =========================================================
     elementos.append(Paragraph(titulo, style_titulo))
     elementos.append(Spacer(1, 10))
 
     # =========================================================
-    # 3) SUBTITULO (solo si existe)
+    # 3) SUBTITULO (si existe)
     # =========================================================
     if subtitulo:
         subtitulo_limpio = str(subtitulo).strip()
@@ -151,11 +155,12 @@ def pdf_tabla(
             elementos.append(Spacer(1, 8))
 
     # =========================================================
-    # 4) DATOS / FILTROS (solo si hay valores reales)
+    # 4) DATOS / FILTROS
     # =========================================================
     filtros_visibles = []
     filtro_lineas = []
     page_header_lines = []
+
     def _celda_label_valor(cell):
         if isinstance(cell, (list, tuple)) and len(cell) == 2:
             etiqueta = str(cell[0]).strip()
@@ -179,19 +184,20 @@ def pdf_tabla(
                     filtro_lineas.append(texto)
                     page_header_lines.append(texto)
                 continue
+
             row_clean = []
             for x in row:
                 row_clean.append(_celda_label_valor(x))
-            # oculta filas completamente vacías
+
             if all(v in ("", "—", "-", "None", "null") for v in row_clean):
                 continue
+
             filtros_visibles.append(row)
             for c in row_clean:
                 if c:
                     page_header_lines.append(c)
 
     if filtro_lineas or filtros_visibles or page_header_lines:
-        # ✅ si titulo_datos es None, NO mostramos "Filtros aplicados"
         if titulo_datos:
             elementos.append(Paragraph(titulo_datos, style_seccion))
 
@@ -210,21 +216,6 @@ def pdf_tabla(
 
         if filtros_visibles:
             ncols = max(len(r) for r in filtros_visibles)
-            # normalizamos filas a ncols
-            norm = []
-            for r in filtros_visibles:
-                r2 = r[:]
-                while len(r2) < ncols:
-                    r2.append("")
-                norm.append(r2)
-
-            # ancho por defecto para 2 columnas de pares etiqueta/valor
-            if ncols == 2:
-                cw = [90 * mm, 90 * mm]
-            else:
-                # fallback proporcional
-                ancho_total = 180 * mm
-                cw = [ancho_total / ncols] * ncols
 
             def _formatear_celda_filtros(cell):
                 if isinstance(cell, (list, tuple)) and len(cell) == 2:
@@ -243,6 +234,12 @@ def pdf_tabla(
                 while len(r2) < ncols:
                     r2.append("")
                 norm.append(r2)
+
+            # ✅ colWidths usando ancho útil real
+            if ncols == 2:
+                cw = [ancho_util / 2, ancho_util / 2]
+            else:
+                cw = [ancho_util / ncols] * ncols
 
             tabla_filtros = Table(norm, colWidths=cw, hAlign="CENTER")
             tabla_filtros.setStyle(TableStyle([
@@ -267,23 +264,32 @@ def pdf_tabla(
         elementos.append(Paragraph("Resumen", style_seccion))
 
         if resumen_en_una_linea:
-            # resumen debe venir como: [[ "Total: ...", "Pagado: ...", "Saldo: ..." ]] o [[ "multilinea" ]]
+            # resumen = [[ "Total: ..." ]] (1 celda) o [[ "...", "...", "..." ]]
             ncols = len(resumen[0]) if resumen and resumen[0] else 1
-            if ncols == 1 and isinstance(resumen[0][0], str) and '\n' in resumen[0][0]:
-                resumen[0][0] = Paragraph(resumen[0][0].replace('\n', '<br/>'), style_normal)
+
+            # Si viene multilinea con saltos, lo convertimos a Paragraph
+            if ncols == 1 and isinstance(resumen[0][0], str) and "\n" in resumen[0][0]:
+                resumen[0][0] = Paragraph(resumen[0][0].replace("\n", "<br/>"), style_normal)
+
+            # ✅ Si solo 1 columna -> una caja completa (ancho útil)
+            if ncols == 1:
+                colWidths = [ancho_util]
+            else:
+                colWidths = [ancho_util / ncols] * ncols
+
             tabla_resumen = Table(
                 resumen,
-                colWidths=[180 * mm] * ncols,
+                colWidths=colWidths,
                 hAlign="CENTER",
             )
         else:
             ncols = max(len(r) for r in resumen)
             if ncols == 1:
-                col_widths_resumen = [180 * mm]
+                col_widths_resumen = [ancho_util]
             elif ncols == 2:
-                col_widths_resumen = [75 * mm, 105 * mm]
+                col_widths_resumen = [ancho_util * 0.42, ancho_util * 0.58]
             else:
-                col_widths_resumen = [180 * mm / ncols] * ncols
+                col_widths_resumen = [ancho_util / ncols] * ncols
 
             tabla_resumen = Table(
                 resumen,
@@ -310,12 +316,10 @@ def pdf_tabla(
     # =========================================================
     data = [columnas] + filas
 
-    # Si no te pasan col_widths, usamos el cálculo simple de antes
+    # ✅ Si no pasan col_widths, calculamos según ancho útil real
     if col_widths is None:
         total_cols = len(columnas)
-        ancho_total = 180 * mm
-        col_width = ancho_total / total_cols
-        col_widths = [col_width] * total_cols
+        col_widths = [ancho_util / total_cols] * total_cols
 
     tabla = Table(data, colWidths=col_widths, repeatRows=1, hAlign="CENTER")
     tabla.setStyle(TableStyle([
@@ -323,35 +327,41 @@ def pdf_tabla(
         ("TEXTCOLOR", (0, 0), (-1, 0), colors.black),
         ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
         ("FONTNAME", (0, 1), (-1, -1), "Helvetica"),
-        ("FONTSIZE", (0, 0), (-1, -1), 8.5),
+        ("FONTSIZE", (0, 0), (-1, -1), 8.0),
         ("GRID", (0, 0), (-1, -1), 0.4, colors.grey),
         ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
         ("ALIGN", (0, 0), (-1, -1), "CENTER"),
-        ("LEFTPADDING", (0, 0), (-1, -1), 4),
-        ("RIGHTPADDING", (0, 0), (-1, -1), 4),
+        ("LEFTPADDING", (0, 0), (-1, -1), 3),
+        ("RIGHTPADDING", (0, 0), (-1, -1), 3),
         ("TOPPADDING", (0, 0), (-1, -1), 4),
         ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
     ]))
 
     elementos.append(tabla)
 
+    # =========================================================
+    # 7) HEADER EN PÁGINAS SIGUIENTES + NÚMERO DE PÁGINA
+    # =========================================================
     def _dibujar_page(canvas, doc, header=False):
         canvas.saveState()
         canvas.setFont("Helvetica", 9)
 
+        # ✅ Header en páginas siguientes, dentro del margen (sin línea negra)
         if header and page_header_lines:
-            y = A4[1] - doc.topMargin + 4 * mm
+            y = A4[1] - 18 * mm         # ✅ baja el texto (más seguro para imprimir)
+            line_gap = 5 * mm
+
             for line in page_header_lines:
                 canvas.drawString(doc.leftMargin, y, line)
-                y -= 5 * mm
-            y_sep = A4[1] - doc.topMargin - 1 * mm
-            canvas.setLineWidth(0.3)
-            canvas.line(doc.leftMargin, y_sep, A4[0] - doc.rightMargin, y_sep)
+                y -= line_gap
 
+        # Número de página
         page_num = f"Página {canvas.getPageNumber()}"
         canvas.setFont("Helvetica", 8)
         canvas.drawRightString(A4[0] - doc.rightMargin, doc.bottomMargin - 6 * mm, page_num)
+
         canvas.restoreState()
+
 
     if repeat_header:
         doc.build(

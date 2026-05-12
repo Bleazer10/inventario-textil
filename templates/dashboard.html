@@ -2,7 +2,6 @@
 
 {% block titulo %}Dashboard{% endblock %}
 
-
 {% block content %}
 <div class="d-flex justify-content-between align-items-center mb-3">
   <div>
@@ -57,18 +56,77 @@
   </div>
 
   <div class="card-body">
-    <div class="row g-3">
+
+    <!-- ✅ ESTILOS SOLO PARA ESTE BLOQUE -->
+    <style>
+      /* Separación vertical entre columnas SOLO en desktop */
+      @media (min-width: 992px){
+        .dash-movs .dash-col{
+          position: relative;
+          padding-left: 18px;
+          padding-right: 18px;
+        }
+        .dash-movs .dash-col:not(:last-child)::after{
+          content:"";
+          position:absolute;
+          top: 4px;
+          right: 0;
+          height: calc(100% - 8px);
+          width: 1px;
+          background: rgba(255,255,255,.10);
+        }
+      }
+
+      /* Pequeño separador debajo del título de cada columna */
+      .dash-movs .dash-col-title{
+        padding-bottom: .4rem;
+        margin-bottom: .6rem;
+        border-bottom: 1px solid rgba(255,255,255,.10);
+      }
+
+      /* Lista: que no se pegue tanto */
+      .dash-movs .list-group-item{
+        border-color: rgba(255,255,255,.10) !important;
+      }
+
+      /* Monto como “pill” */
+      .dash-movs .amt-pill{
+        background: rgba(255,255,255,.06);
+        border: 1px solid rgba(255,255,255,.12);
+        padding: .25rem .55rem;
+        border-radius: 10px;
+        white-space: nowrap;
+      }
+    </style>
+
+    <div class="row g-3 dash-movs">
 
       <!-- Ventas -->
-      <div class="col-lg-4">
-        <div class="fw-bold mb-2">Ventas</div>
+      <div class="col-lg-4 dash-col">
+        <div class="dash-col-title fw-bold mb-2">Ventas</div>
+
         <ul class="list-group list-group-flush">
           {% for v in ultimas_ventas %}
-            <li class="list-group-item bg-transparent text-white d-flex justify-content-between align-items-center px-0">
-              <span class="text-white-50">
-                {{ v.fecha }} • #{{ v.id }} • {{ v.cliente.nombre|default:"General" }}
-              </span>
-              <span class="fw-bold">${{ v.total }}</span>
+            <li class="list-group-item bg-transparent text-white px-0 py-2">
+              <div class="d-flex justify-content-between align-items-start gap-2">
+                <div class="flex-grow-1">
+                  <div class="d-flex align-items-center gap-2">
+                    <span class="badge rounded-pill text-bg-success">Venta</span>
+                    <span class="text-white-50 small">
+                      {{ v.fecha }} • #{{ v.id }}
+                    </span>
+                  </div>
+
+                  <div class="small mt-1">
+                    <span class="text-white-50">Cliente:</span>
+                    <span class="text-white">{{ v.cliente.nombre|default:"General" }}</span>
+                  </div>
+                </div>
+
+                <span class="fw-bold amt-pill">
+                  ${{ v.total }}
+                </span>
+              </div>
             </li>
           {% empty %}
             <li class="list-group-item bg-transparent text-white-50 px-0">No hay ventas recientes.</li>
@@ -77,15 +135,35 @@
       </div>
 
       <!-- Gastos -->
-      <div class="col-lg-4">
-        <div class="fw-bold mb-2">Gastos</div>
+      <div class="col-lg-4 dash-col">
+        <div class="dash-col-title fw-bold mb-2">Gastos</div>
+
         <ul class="list-group list-group-flush">
           {% for g in ultimos_gastos %}
-            <li class="list-group-item bg-transparent text-white d-flex justify-content-between align-items-center px-0">
-              <span class="text-white-50">
-                {{ g.fecha }} • #{{ g.id }} • {{ g.categoria.nombre }}
-              </span>
-              <span class="fw-bold">${{ g.monto }}</span>
+            <li class="list-group-item bg-transparent text-white px-0 py-2">
+              <div class="d-flex justify-content-between align-items-start gap-2">
+                <div class="flex-grow-1">
+                  <div class="d-flex align-items-center gap-2">
+                    <span class="badge rounded-pill text-bg-warning">Gasto</span>
+                    <span class="text-white-50 small">
+                      {{ g.fecha }} • #{{ g.id }}
+                    </span>
+                  </div>
+
+                  <div class="small mt-1">
+                    <span class="text-white-50">Categoría:</span>
+                    <span class="text-white">{{ g.categoria.nombre }}</span>
+                    {% if g.proveedor %}
+                      <span class="text-white-50"> • Proveedor:</span>
+                      <span class="text-white">{{ g.proveedor.nombre }}</span>
+                    {% endif %}
+                  </div>
+                </div>
+
+                <span class="fw-bold amt-pill">
+                  ${{ g.monto }}
+                </span>
+              </div>
             </li>
           {% empty %}
             <li class="list-group-item bg-transparent text-white-50 px-0">No hay gastos recientes.</li>
@@ -94,15 +172,35 @@
       </div>
 
       <!-- Pagos -->
-      <div class="col-lg-4">
-        <div class="fw-bold mb-2">Pagos / Cobros</div>
+      <div class="col-lg-4 dash-col">
+        <div class="dash-col-title fw-bold mb-2">Pagos / Cobros</div>
+
         <ul class="list-group list-group-flush">
           {% for p in ultimos_pagos %}
-            <li class="list-group-item bg-transparent text-white d-flex justify-content-between align-items-center px-0">
-              <span class="text-white-50">
-                {{ p.fecha }} • {{ p.get_direccion_display }} • {{ p.metodo|default:"-" }}
-              </span>
-              <span class="fw-bold">${{ p.monto }}</span>
+            <li class="list-group-item bg-transparent text-white px-0 py-2">
+              <div class="d-flex justify-content-between align-items-start gap-2">
+                <div class="flex-grow-1">
+                  <div class="d-flex align-items-center gap-2">
+                    {% if p.direccion == "ENTRADA" %}
+                      <span class="badge rounded-pill text-bg-primary">Cobro</span>
+                    {% else %}
+                      <span class="badge rounded-pill text-bg-secondary">Pago</span>
+                    {% endif %}
+
+                    <span class="text-white-50 small">
+                      {{ p.fecha }} • {{ p.metodo|default:"-" }}
+                    </span>
+                  </div>
+
+                  <div class="small mt-1 text-white-50">
+                    {{ p.get_direccion_display }}
+                  </div>
+                </div>
+
+                <span class="fw-bold amt-pill">
+                  ${{ p.monto }}
+                </span>
+              </div>
             </li>
           {% empty %}
             <li class="list-group-item bg-transparent text-white-50 px-0">No hay pagos/cobros recientes.</li>

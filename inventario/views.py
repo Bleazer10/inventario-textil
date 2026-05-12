@@ -827,7 +827,12 @@ def existencias(request):
             ),
             Value(Decimal("0.00")),
         )
-    ).order_by("almacen__nombre", "tipo")
+    ).order_by("almacen__nombre",
+    "tipo",
+    "material__nombre",
+    "variante_producto__producto__nombre",
+    "variante_producto__nombre",
+    )
 
     almacenes = Almacen.objects.filter(activo=True).order_by("nombre")
 
@@ -1897,7 +1902,7 @@ def estadisticas(request):
         ventas_dia.append(float(mapa_ventas_dia.get(d, Decimal("0.00"))))
         gastos_dia.append(float(mapa_gastos_dia.get(d, Decimal("0.00"))))
 
-   # =========================
+    # =========================
     # 2) VENTAS / GASTOS POR SEMANA ISO REAL (MySQL: YEARWEEK(fecha, 3))
     # =========================
     semanas = 8

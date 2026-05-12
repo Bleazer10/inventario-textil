@@ -129,6 +129,14 @@ main {
   font-weight: 800;
 }
 
+.nav-bemore-tabs .nav-link,
+.nav-bemore-tabs .nav-link.active {
+  color: var(--bemore-orange) !important;
+}
+.nav-bemore-tabs .nav-link.active {
+  border-color: var(--bemore-orange) !important;
+}
+
 /* Inputs blancos (como los quieres) */
 .form-control{
   background: #ffffff;
@@ -224,3 +232,134 @@ input:-webkit-autofill:focus{
   color: var(--bemore-white);
 }
 
+/* =========================
+   Tabs (Movimientos / BEMORE)
+   Quita el azul de Bootstrap y usa naranja
+========================= */
+.nav-bemore-tabs{
+  border-bottom: 1px solid rgba(255,255,255,.18);
+}
+
+.nav-bemore-tabs .nav-link{
+  color: rgba(255,255,255,.75) !important; /* evita azul */
+  background: transparent !important;
+  border: none !important;
+  margin-right: .25rem;
+}
+
+.nav-bemore-tabs .nav-link:hover{
+  color: var(--bemore-orange) !important;
+}
+
+.nav-bemore-tabs .nav-link.active{
+  color: var(--bemore-orange) !important;
+  background: transparent !important;
+  border: none !important;
+  border-bottom: 2px solid var(--bemore-orange) !important;
+  font-weight: 800;
+}
+
+/* =========================
+   Mensajes (Django messages) - BEMORE
+========================= */
+
+.bemore-messages{
+  margin-bottom: 1rem;
+  display: grid;
+  gap: .65rem;
+}
+
+.bemore-alert{
+  display: grid;
+  grid-template-columns: 44px 1fr 40px;
+  align-items: start;
+  gap: .75rem;
+  padding: .85rem 1rem;
+  border-radius: 14px;
+  border: 1px solid rgba(255,255,255,.14);
+  background: rgba(17,17,17,.70);
+  box-shadow: 0 10px 26px rgba(0,0,0,.28);
+  color: #fff;
+  animation: bemoreSlideIn .18s ease-out;
+}
+
+@keyframes bemoreSlideIn{
+  from { transform: translateY(-6px); opacity: 0; }
+  to   { transform: translateY(0); opacity: 1; }
+}
+
+.bemore-alert-icon{
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+  display: grid;
+  place-items: center;
+  background: rgba(255,255,255,.06);
+  border: 1px solid rgba(255,255,255,.10);
+  font-size: 18px;
+}
+
+.bemore-alert-title{
+  font-weight: 900;
+  font-size: 0.95rem;
+  line-height: 1.1;
+  margin-top: .1rem;
+}
+
+.bemore-alert-text{
+  color: rgba(255,255,255,.82);
+  font-size: .95rem;
+  line-height: 1.25rem;
+  margin-top: .25rem;
+}
+
+.bemore-alert-close{
+  border: 0;
+  background: transparent;
+  color: rgba(255,255,255,.7);
+  padding: .35rem;
+  border-radius: 10px;
+  cursor: pointer;
+  margin-top: .1rem;
+}
+.bemore-alert-close:hover{
+  background: rgba(255,255,255,.06);
+  color: #fff;
+}
+
+/* Variantes por tipo */
+.bemore-alert-success{
+  border-color: rgba(34,197,94,.30);
+}
+.bemore-alert-success .bemore-alert-icon{
+  background: rgba(34,197,94,.14);
+  border-color: rgba(34,197,94,.25);
+  color: rgba(34,197,94,1);
+}
+
+.bemore-alert-error{
+  border-color: rgba(255,77,0,.35);
+}
+.bemore-alert-error .bemore-alert-icon{
+  background: rgba(255,77,0,.14);
+  border-color: rgba(255,77,0,.25);
+  color: var(--bemore-orange);
+}
+
+.bemore-alert-warning{
+  border-color: rgba(245,158,11,.35);
+}
+.bemore-alert-warning .bemore-alert-icon{
+  background: rgba(245,158,11,.14);
+  border-color: rgba(245,158,11,.25);
+  color: rgba(245,158,11,1);
+}
+
+.bemore-alert-info{
+  border-color: rgba(59,130,246,.35);
+}
+.bemore-alert-info .bemore-alert-icon{
+  background: rgba(59,130,246,.14);
+  border-color: rgba(59,130,246,.25);
+  color: rgba(59,130,246,1);
+}

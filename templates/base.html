@@ -240,9 +240,36 @@
   <!-- Contenido -->
   <main class="container py-4">
     {% if messages %}
-      <div class="mb-3">
+      <div class="bemore-messages" role="status" aria-live="polite" aria-atomic="true">
         {% for message in messages %}
-          <div class="alert alert-{{ message.tags }} mb-2">{{ message }}</div>
+          <div class="bemore-alert bemore-alert-{{ message.tags|default:'info' }}">
+            <div class="bemore-alert-icon">
+              {% if "success" in message.tags %}
+                <i class="fa-solid fa-circle-check"></i>
+              {% elif "error" in message.tags %}
+                <i class="fa-solid fa-triangle-exclamation"></i>
+              {% elif "warning" in message.tags %}
+                <i class="fa-solid fa-circle-exclamation"></i>
+              {% else %}
+                <i class="fa-solid fa-circle-info"></i>
+              {% endif %}
+            </div>
+
+            <div class="bemore-alert-body">
+              <div class="bemore-alert-title">
+                {% if "success" in message.tags %}Listo
+                {% elif "error" in message.tags %}Atención
+                {% elif "warning" in message.tags %}Aviso
+                {% else %}Info
+                {% endif %}
+              </div>
+              <div class="bemore-alert-text">{{ message }}</div>
+            </div>
+
+            <button type="button" class="bemore-alert-close" aria-label="Cerrar">
+              <i class="fa-solid fa-xmark"></i>
+            </button>
+          </div>
         {% endfor %}
       </div>
     {% endif %}
@@ -261,6 +288,24 @@
 
   <!-- Bootstrap JS -->
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+  <script>
+  // Cerrar alert de mensajes
+  document.addEventListener("click", (e) => {
+    const btn = e.target.closest(".bemore-alert-close");
+    if (!btn) return;
+    const alert = btn.closest(".bemore-alert");
+    if (alert) alert.remove();
+  });
+
+  // Auto-ocultar mensajes success/info (opcional)
+  window.addEventListener("load", () => {
+    document.querySelectorAll(".bemore-alert-success, .bemore-alert-info").forEach(el => {
+      setTimeout(() => {
+        if (el && el.parentNode) el.remove();
+      }, 5000);
+    });
+  });
+</script>
   {% block extra_js %}{% endblock %}
 </body>
 </html>
