@@ -2,10 +2,10 @@ from django.contrib.auth.decorators import login_required
 from django.shortcuts import render
 from inventario.reportes.utils_pdf import pdf_tabla
 from inventario.reportes.utils_excel import excel_reporte
-from inventario.models import Venta, DetalleVenta
+from inventario.models import Venta, DetalleVenta, Compra, DetalleCompra
 from datetime import datetime
 from decimal import Decimal
-from django.db.models import Q, Sum, Min, Max
+from django.db.models import Q, Sum, Min, Max, ExpressionWrapper, F, DecimalField
 from django.db.models.functions import Coalesce
 from django.shortcuts import get_object_or_404
 from reportlab.lib.units import mm
@@ -354,4 +354,348 @@ def reporte_venta_factura_excel(request, venta_id):
         logo_relpath="img/logo-bemore.jpeg",
         nombre_empresa="BEMORE",
         formato_moneda_cols=[4, 5, 6],
+    )
+
+@login_required
+def reporte_compras(request):
+    fi = _parse_date(request.GET.get("fi", ""))
+    ff = _parse_date(request.GET.get("ff", ""))
+    q = (request.GET.get("q", "") or "").strip()
+    estado = (request.GET.get("estado", "") or "").strip()
+    estado_pago = (request.GET.get("estado_pago", "") or "").strip()
+
+    qs = Compra.objects.select_related("proveedor").all()
+
+    if fi:
+        qs = qs.filter(fecha__gte=fi)
+    if ff:
+        qs = qs.filter(fecha__lte=ff)
+    if estado:
+        qs = qs.filter(estado=estado)
+    if estado_pago:
+        qs = qs.filter(estado_pago=estado_pago)
+    if q:
+        qs = qs.filter(Q(proveedor__nombre__icontains=q) | Q(id__icontains=q))
+
+    qs = qs.order_by("-fecha", "-id")
+
+    # Total por compra = suma(detalle.cantidad * detalle.costo_unitario)
+    total_expr = ExpressionWrapper(
+        F("detalles__cantidad") * F("detalles__costo_unitario"),
+        output_field=DecimalField(max_digits=12, decimal_places=2),
+    )
+
+    agg = qs.aggregate(
+        total=Coalesce(Sum(total_expr), Decimal("0.00")),
+    )
+
+    resumen = {
+        "cantidad": qs.count(),
+        "total": agg["total"].quantize(Decimal("0.01")),
+    }
+
+    limite_vista = 500
+    compras = qs[:limite_vista]
+
+    return render(request, "reportes/compras.html", {
+        "compras": compras,
+        "resumen": resumen,
+        "limite_vista": limite_vista,
+
+        "fi": fi.strftime("%Y-%m-%d") if fi else "",
+        "ff": ff.strftime("%Y-%m-%d") if ff else "",
+        "q": q,
+        "estado": estado,
+        "estado_pago": estado_pago,
+
+        "estado_choices": Compra.Estado.choices,
+        "estado_pago_choices": Compra.EstadoPago.choices,
+    })
+
+
+@login_required
+def reporte_compras_pdf(request):
+    fi = _parse_date(request.GET.get("fi", ""))
+    ff = _parse_date(request.GET.get("ff", ""))
+    q = (request.GET.get("q", "") or "").strip()
+    estado = (request.GET.get("estado", "") or "").strip()
+    estado_pago = (request.GET.get("estado_pago", "") or "").strip()
+
+    qs = Compra.objects.select_related("proveedor").all()
+
+    if fi:
+        qs = qs.filter(fecha__gte=fi)
+    if ff:
+        qs = qs.filter(fecha__lte=ff)
+    if estado:
+        qs = qs.filter(estado=estado)
+    if estado_pago:
+        qs = qs.filter(estado_pago=estado_pago)
+    if q:
+        qs = qs.filter(Q(proveedor__nombre__icontains=q) | Q(id__icontains=q))
+
+    qs = qs.order_by("-fecha", "-id")
+
+    total_expr = ExpressionWrapper(
+        F("detalles__cantidad") * F("detalles__costo_unitario"),
+        output_field=DecimalField(max_digits=12, decimal_places=2),
+    )
+
+    total_compras = qs.aggregate(s=Coalesce(Sum(total_expr), Decimal("0.00")))["s"]
+    cant = qs.count()
+
+    resumen = [
+        ["Cantidad de compras", str(cant)],
+        ["Total comprado", f"${total_compras.quantize(Decimal('0.01'))}"],
+    ]
+
+    periodo = _build_periodo_text(fi, ff, qs)
+    fecha_emision = timezone.localdate()
+
+    filtros = []
+    if periodo:
+        filtros.append(periodo)
+    filtros.append(f"Fecha de emisión: {_fmt_fecha(fecha_emision)}")
+
+    columnas = ["#Compra", "Fecha", "Proveedor", "Estado", "Estado pago", "Total"]
+
+    # Para calcular total por compra sin hacer 1 query por fila:
+    # anotamos total_compra
+    qs = qs.annotate(
+        total_compra=Coalesce(Sum(total_expr), Decimal("0.00"))
+    )
+
+    filas = []
+    for c in qs[:5000]:
+        filas.append([
+            c.id,
+            str(c.fecha),
+            c.proveedor.nombre,
+            c.get_estado_display(),
+            c.get_estado_pago_display(),
+            f"${c.total_compra}",
+        ])
+
+    col_widths = [
+    18*mm,  # #Compra
+    22*mm,  # Fecha
+    55*mm,  # Proveedor  ✅ más ancho
+    26*mm,  # Estado
+    28*mm,  # Estado pago
+    22*mm,  # Total
+]
+
+    return pdf_tabla(
+        "reporte_compras",
+        "Reporte de Compras",
+        None,
+        columnas,
+        filas,
+        resumen=resumen,
+        filtros=filtros,
+        titulo_datos=None,
+        repeat_header=True,                 # ✅ multi-página: repite solo líneas arriba
+        col_widths=col_widths,              # proveedor más ancho
+        logo_relpath="img/logo-bemore.jpeg",
+        nombre_empresa="BEMORE",
+    )
+
+
+@login_required
+def reporte_compras_excel(request):
+    fi = _parse_date(request.GET.get("fi", ""))
+    ff = _parse_date(request.GET.get("ff", ""))
+    q = (request.GET.get("q", "") or "").strip()
+    estado = (request.GET.get("estado", "") or "").strip()
+    estado_pago = (request.GET.get("estado_pago", "") or "").strip()
+
+    qs = Compra.objects.select_related("proveedor").all()
+
+    if fi:
+        qs = qs.filter(fecha__gte=fi)
+    if ff:
+        qs = qs.filter(fecha__lte=ff)
+    if estado:
+        qs = qs.filter(estado=estado)
+    if estado_pago:
+        qs = qs.filter(estado_pago=estado_pago)
+    if q:
+        qs = qs.filter(Q(proveedor__nombre__icontains=q) | Q(id__icontains=q))
+
+    qs = qs.order_by("-fecha", "-id")[:20000]
+
+    total_expr = ExpressionWrapper(
+        F("detalles__cantidad") * F("detalles__costo_unitario"),
+        output_field=DecimalField(max_digits=12, decimal_places=2),
+    )
+
+    total_compras = qs.aggregate(s=Coalesce(Sum(total_expr), Decimal("0.00")))["s"]
+
+    resumen = [
+        ["Cantidad de compras", str(qs.count())],
+        ["Total comprado", f"${total_compras.quantize(Decimal('0.01'))}"],
+    ]
+
+    periodo = _build_periodo_text(fi, ff, qs)
+    fecha_emision = timezone.localdate()
+    filtros = []
+    if periodo:
+        filtros.append(periodo)
+    filtros.append(f"Fecha de emisión: {_fmt_fecha(fecha_emision)}")
+
+    columnas = ["#Compra", "Fecha", "Proveedor", "Estado", "Estado pago", "Total"]
+
+    qs = qs.annotate(
+        total_compra=Coalesce(Sum(total_expr), Decimal("0.00"))
+    )
+
+    filas = []
+    for c in qs:
+        filas.append([
+            c.id,
+            str(c.fecha),
+            c.proveedor.nombre,
+            c.get_estado_display(),
+            c.get_estado_pago_display(),
+            float(c.total_compra),
+        ])
+
+    return excel_reporte(
+        nombre_archivo="reporte_compras",
+        hoja="Compras",
+        titulo="Reporte de Compras",
+        columnas=columnas,
+        filas=filas,
+        filtros=filtros,
+        resumen=resumen,
+        logo_relpath="img/logo-bemore.jpeg",
+        nombre_empresa="BEMORE",
+        formato_moneda_cols=[5],   # Total (col index 5)
+    )
+
+def _fmt_fecha(d):
+    return d.strftime("%d/%m/%Y") if d else ""
+
+@login_required
+def reporte_compra_factura_pdf(request, compra_id):
+    compra = get_object_or_404(
+        Compra.objects.select_related("proveedor"),
+        id=compra_id
+    )
+
+    detalles = (
+        DetalleCompra.objects
+        .filter(compra=compra)
+        .select_related("material", "material__categoria")
+        .order_by("id")
+    )
+
+    fecha_emision = timezone.localdate()
+
+    # ✅ Datos de cabecera (2 columnas / 3 filas), sin “Filtros aplicados”
+    filtros = [
+        [f"#Compra: {compra.id}", f"Fecha: {_fmt_fecha(compra.fecha)}"],
+        [f"Estado: {compra.get_estado_display()}", f"Estado pago: {compra.get_estado_pago_display()}"],
+        [f"Proveedor: {compra.proveedor.nombre}", f"Emisión: {_fmt_fecha(fecha_emision)}"],
+    ]
+
+    # Totales
+    total = 0.0
+    filas = []
+    for d in detalles:
+        subtotal = float(d.cantidad) * float(d.costo_unitario)
+        total += subtotal
+        filas.append([
+            d.material.nombre,
+            d.material.unidad,
+            float(d.cantidad),
+            f"${float(d.costo_unitario):.2f}",
+            f"${subtotal:.2f}",
+        ])
+
+    # ✅ Resumen en una sola caja (una fila)
+    resumen = [[f"Total: ${total:.2f}"]]
+
+    columnas = ["Material", "Unidad", "Cant.", "Costo unit.", "Subtotal"]
+
+    # ✅ Anchos para que “Proveedor”/Material no se corte
+    col_widths = [
+        55 * mm,  # Material (más ancho)
+        22 * mm,  # Unidad
+        18 * mm,  # Cant
+        28 * mm,  # Costo unit
+        27 * mm,  # Subtotal
+    ]
+
+    return pdf_tabla(
+        nombre_archivo=f"factura_compra_{compra.id}",
+        titulo="Factura / Detalle de Compra",
+        subtitulo=None,
+        columnas=columnas,
+        filas=filas,
+        filtros=filtros,
+        resumen=resumen,
+
+        titulo_datos=None,          # ✅ no mostrar “Filtros aplicados”
+        resumen_en_una_linea=True,  # ✅ caja única
+        col_widths=col_widths,
+        repeat_header=False,        # factura normalmente 1 página
+
+        logo_relpath="img/logo-bemore.jpeg",
+        nombre_empresa="BEMORE",
+    )
+
+@login_required
+def reporte_compra_factura_excel(request, compra_id):
+    compra = get_object_or_404(
+        Compra.objects.select_related("proveedor"),
+        id=compra_id
+    )
+
+    detalles = (
+        DetalleCompra.objects
+        .filter(compra=compra)
+        .select_related("material", "material__categoria")
+        .order_by("id")
+    )
+
+    fecha_emision = timezone.localdate()
+
+    filtros = [
+        [f"#Compra: {compra.id}", f"Fecha: {_fmt_fecha(compra.fecha)}"],
+        [f"Estado: {compra.get_estado_display()}", f"Estado pago: {compra.get_estado_pago_display()}"],
+        [f"Emisión: {_fmt_fecha(fecha_emision)}", f"Proveedor: {compra.proveedor.nombre}"],
+    ]
+
+    filas = []
+    total = 0.0
+    for d in detalles:
+        subtotal = float(d.cantidad) * float(d.costo_unitario)
+        total += subtotal
+        filas.append([
+            d.material.nombre,
+            d.material.unidad,
+            float(d.cantidad),
+            float(d.costo_unitario),
+            float(subtotal),
+        ])
+
+    resumen = [
+        ["Total", f"${total:.2f}"],
+    ]
+
+    columnas = ["Material", "Unidad", "Cantidad", "Costo unit.", "Subtotal"]
+
+    # dinero: costo unit y subtotal -> indices 3,4
+    return excel_reporte(
+        nombre_archivo=f"factura_compra_{compra.id}",
+        hoja="Factura Compra",
+        titulo=f"Factura Compra #{compra.id}",
+        columnas=columnas,
+        filas=filas,
+        filtros=filtros,
+        resumen=resumen,
+        logo_relpath="img/logo-bemore.jpeg",
+        nombre_empresa="BEMORE",
+        formato_moneda_cols=[3, 4],
     )

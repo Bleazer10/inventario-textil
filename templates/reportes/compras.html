@@ -1,0 +1,119 @@
+{% extends "base.html" %}
+{% block titulo %}Reporte de Compras{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <div>
+    <h2 class="fw-black mb-1">Reporte de Compras</h2>
+    <div class="text-white-50">Filtra, revisa el resumen y exporta en PDF o Excel.</div>
+  </div>
+</div>
+
+<form method="get" class="row g-2 align-items-end mb-3">
+  <div class="col-md-3">
+    <label class="form-label">Fecha inicio</label>
+    <input type="date" name="fi" class="form-control" value="{{ fi }}">
+  </div>
+  <div class="col-md-3">
+    <label class="form-label">Fecha fin</label>
+    <input type="date" name="ff" class="form-control" value="{{ ff }}">
+  </div>
+
+  <div class="col-md-2">
+    <label class="form-label">Estado</label>
+    <select name="estado" class="form-control">
+      <option value="">Todos</option>
+      {% for val, label in estado_choices %}
+        <option value="{{ val }}" {% if estado == val %}selected{% endif %}>{{ label }}</option>
+      {% endfor %}
+    </select>
+  </div>
+
+  <div class="col-md-2">
+    <label class="form-label">Estado pago</label>
+    <select name="estado_pago" class="form-control">
+      <option value="">Todos</option>
+      {% for val, label in estado_pago_choices %}
+        <option value="{{ val }}" {% if estado_pago == val %}selected{% endif %}>{{ label }}</option>
+      {% endfor %}
+    </select>
+  </div>
+
+  <div class="col-md-2">
+    <label class="form-label">Buscar</label>
+    <input type="text" name="q" class="form-control" value="{{ q }}" placeholder="Proveedor o #compra">
+  </div>
+
+  <!-- Barra inferior: Export a la izquierda, Aplicar/Limpiar a la derecha -->
+  <div class="col-12 d-flex justify-content-between align-items-center mt-2 flex-wrap gap-2">
+    <div class="d-flex gap-2 flex-wrap">
+      <a class="btn btn-bemore fw-bold"
+         href="{% url 'reporte_compras_pdf' %}?fi={{ fi }}&ff={{ ff }}&q={{ q|urlencode }}&estado={{ estado }}&estado_pago={{ estado_pago }}">
+        Exportar PDF
+      </a>
+
+      <a class="btn btn-outline-light fw-bold"
+         href="{% url 'reporte_compras_excel' %}?fi={{ fi }}&ff={{ ff }}&q={{ q|urlencode }}&estado={{ estado }}&estado_pago={{ estado_pago }}">
+        Exportar Excel
+      </a>
+    </div>
+
+    <div class="d-flex gap-2">
+      <button class="btn btn-outline-light fw-bold" type="submit">Aplicar</button>
+      <a class="btn btn-sm btn-outline-light fw-bold" href="{% url 'reporte_compras' %}">Limpiar</a>
+    </div>
+  </div>
+</form>
+
+{% if resumen %}
+  <div class="row g-3 mb-3">
+    <div class="col-md-4">
+      <div class="card card-bemore p-3">
+        <div class="text-white-50">Cantidad</div>
+        <div class="fs-4 fw-black">{{ resumen.cantidad }}</div>
+      </div>
+    </div>
+    <div class="col-md-8">
+      <div class="card card-bemore p-3">
+        <div class="text-white-50">Total comprado</div>
+        <div class="fs-4 fw-black">${{ resumen.total }}</div>
+      </div>
+    </div>
+  </div>
+{% endif %}
+
+<div class="card card-bemore">
+  <div class="card-header">Vista previa (últimas {{ limite_vista|default:"500" }})</div>
+  <div class="card-body table-responsive">
+    <table class="table table-bemore align-middle">
+      <thead>
+        <tr>
+          <th>#</th>
+          <th>Fecha</th>
+          <th>Proveedor</th>
+          <th>Estado</th>
+          <th>Estado pago</th>
+          <th class="text-end">Factura</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for c in compras %}
+        <tr>
+          <td class="fw-bold">#{{ c.id }}</td>
+          <td class="text-white-50">{{ c.fecha }}</td>
+          <td>{{ c.proveedor.nombre }}</td>
+          <td>{{ c.get_estado_display }}</td>
+          <td>{{ c.get_estado_pago_display }}</td>
+          <td class="text-end">
+            <a class="btn btn-sm btn-outline-light" href="{% url 'reporte_compra_factura_pdf' c.id %}">PDF</a>
+            <a class="btn btn-sm btn-outline-light" href="{% url 'reporte_compra_factura_excel' c.id %}">Excel</a>
+          </td>
+        </tr>
+        {% empty %}
+        <tr><td colspan="6" class="text-white-50">No hay compras para ese filtro.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}
