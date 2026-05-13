@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% load widget_tweaks %}
 
 {% block titulo %}Nuevo producto{% endblock %}
 
@@ -13,25 +14,168 @@
 {% endblock %}
 
 {% block content %}
-<div class="mb-3">
-  <h2 class="fw-black mb-0">Nuevo producto</h2>
-  <div class="text-white-50">Crea un producto base (las tallas/modelos van en variantes)</div>
+<div class="d-flex justify-content-between align-items-start flex-wrap gap-2 mb-3">
+  <div>
+    <h2 class="fw-black mb-1">Nuevo producto</h2>
+    <div class="text-white-50">
+      Crea el producto base. Luego podrás agregar <strong>variantes</strong> (tallas/modelos) con SKU.
+    </div>
+  </div>
+
+  <div class="text-white-50 small">
+    <span class="badge text-bg-dark border border-light-subtle me-1">Paso 1</span>
+    Producto
+    <span class="mx-1">→</span>
+    <span class="badge text-bg-dark border border-light-subtle me-1">Paso 2</span>
+    Variantes
+  </div>
 </div>
 
 <div class="row justify-content-center">
-  <div class="col-12 col-lg-7">
+  <div class="col-12 col-lg-9 col-xl-8">
+
     <div class="card card-bemore">
-      <div class="card-header text-center">Crear producto</div>
-      <div class="card-body">
-        <form method="post">
+      <div class="card-header d-flex align-items-center justify-content-between">
+        <div class="d-flex align-items-center">
+          <i class="fa-solid fa-box-open me-2"></i>
+          <span class="fw-bold">Información del producto</span>
+        </div>
+        <span class="text-white-50 small">Campos obligatorios *</span>
+      </div>
+
+      <div class="card-body p-4">
+        <form method="post" novalidate>
           {% csrf_token %}
-          {{ form.as_p }}
-          <button class="btn btn-bemore w-100 fw-bold" type="submit">
-            <i class="fa-solid fa-floppy-disk me-2"></i> Guardar
-          </button>
+
+          {% if form.non_field_errors %}
+            <div class="alert alert-danger">
+              {{ form.non_field_errors }}
+            </div>
+          {% endif %}
+
+          <!-- ✅ Bloque principal en 2 columnas -->
+          <div class="row g-4">
+
+            <!-- Columna izquierda -->
+            <div class="col-12 col-lg-7">
+              <div class="mb-3">
+                <label class="form-label">
+                  <i class="fa-solid fa-tags me-1 text-orange"></i> Categoría *
+                </label>
+                {% render_field form.categoria class="form-control" %}
+                {% if form.categoria.errors %}
+                  <div class="text-warning small mt-1">{{ form.categoria.errors|striptags }}</div>
+                {% endif %}
+              </div>
+
+              <div class="mb-3">
+                <label class="form-label">
+                  <i class="fa-solid fa-shirt me-1 text-orange"></i> Nombre del producto *
+                </label>
+                {% render_field form.nombre class="form-control" placeholder="Ej: Franela, Suéter, Short, Uniforme..." %}
+                {% if form.nombre.errors %}
+                  <div class="text-warning small mt-1">{{ form.nombre.errors|striptags }}</div>
+                {% endif %}
+                <div class="text-white-50 small mt-1">
+                  Tip: usa un nombre general. La talla/color va en variantes.
+                </div>
+              </div>
+
+              <div class="mb-0">
+                <label class="form-label">
+                  <i class="fa-solid fa-dollar-sign me-1 text-orange"></i> Precio de venta por defecto *
+                </label>
+                <div class="input-group">
+                  <span class="input-group-text bg-dark text-white border-secondary">$</span>
+                  {% render_field form.precio_venta_defecto class="form-control" placeholder="0.00" %}
+                </div>
+                {% if form.precio_venta_defecto.errors %}
+                  <div class="text-warning small mt-1">{{ form.precio_venta_defecto.errors|striptags }}</div>
+                {% endif %}
+                <div class="text-white-50 small mt-1">
+                  Si una variante no tiene precio, usará este valor.
+                </div>
+              </div>
+            </div>
+
+            <!-- Columna derecha -->
+            <div class="col-12 col-lg-5">
+              <div class="p-3 rounded-3" style="border:1px solid rgba(255,255,255,.12); background: rgba(255,255,255,.04);">
+                <div class="fw-bold mb-2">
+                  <i class="fa-solid fa-gear me-2 text-orange"></i> Opciones
+                </div>
+
+                <div class="form-check mb-3">
+                  {% render_field form.controla_inventario class="form-check-input" %}
+                  <label class="form-check-label">
+                    Controla inventario
+                  </label>
+                  <div class="text-white-50 small">
+                    Si está activo, las ventas generan SALIDA en inventario.
+                  </div>
+                  {% if form.controla_inventario.errors %}
+                    <div class="text-warning small mt-1">{{ form.controla_inventario.errors|striptags }}</div>
+                  {% endif %}
+                </div>
+
+                <div class="form-check">
+                  {% render_field form.activo class="form-check-input" %}
+                  <label class="form-check-label">
+                    Producto activo
+                  </label>
+                  <div class="text-white-50 small">
+                    Si lo desactivas, no aparecerá en ventas ni listados.
+                  </div>
+                  {% if form.activo.errors %}
+                    <div class="text-warning small mt-1">{{ form.activo.errors|striptags }}</div>
+                  {% endif %}
+                </div>
+
+                <hr class="border-light opacity-25 my-3">
+
+                <div class="text-white-50 small">
+                  <div class="fw-bold text-white mb-1">
+                    <i class="fa-solid fa-circle-info me-2 text-orange"></i> ¿Qué sigue?
+                  </div>
+                  <ul class="mb-0 ps-3">
+                    <li>Crear el producto (aquí).</li>
+                    <li>Agregar variantes con SKU.</li>
+                    <li>Luego, si aplica: fórmulas y producción.</li>
+                  </ul>
+                </div>
+              </div>
+            </div>
+
+          </div>
+
+          <!-- ✅ Descripción en sección aparte -->
+          <hr class="border-light opacity-25 my-4">
+
+          <div class="mb-4">
+            <label class="form-label">
+              <i class="fa-solid fa-pen-to-square me-1 text-orange"></i> Descripción
+              <span class="text-white-50 fw-normal ms-1">(opcional)</span>
+            </label>
+            {% render_field form.descripcion class="form-control" rows="3" placeholder="Detalles, notas, recomendaciones, etc." %}
+            {% if form.descripcion.errors %}
+              <div class="text-warning small mt-1">{{ form.descripcion.errors|striptags }}</div>
+            {% endif %}
+          </div>
+
+          <!-- ✅ Botones -->
+          <div class="d-flex gap-2">
+            <button class="btn btn-bemore fw-bold flex-fill" type="submit">
+              <i class="fa-solid fa-floppy-disk me-2"></i> Guardar producto
+            </button>
+            <a href="{% url 'lista_productos' %}" class="btn btn-outline-light fw-bold flex-fill">
+              <i class="fa-solid fa-times me-2"></i> Cancelar
+            </a>
+          </div>
+
         </form>
       </div>
     </div>
+
   </div>
 </div>
 {% endblock %}

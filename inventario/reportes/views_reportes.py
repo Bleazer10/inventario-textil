@@ -10,6 +10,7 @@ from django.db.models.functions import Coalesce
 from django.shortcuts import get_object_or_404
 from reportlab.lib.units import mm
 from django.utils import timezone
+from django.core.paginator import Paginator
 
 def _parse_date(s):
     try:
@@ -62,7 +63,7 @@ def reporte_ventas(request):
 
     qs = qs.order_by("-fecha", "-id")
 
-    # ✅ Resumen (para mostrar en pantalla)
+    # ✅ Resumen (sobre TODO el queryset filtrado)
     agg = qs.aggregate(
         total=Coalesce(Sum("total"), Decimal("0.00")),
         pagado=Coalesce(Sum("monto_pagado"), Decimal("0.00")),
@@ -71,18 +72,21 @@ def reporte_ventas(request):
 
     resumen = {
         "cantidad": qs.count(),
-        "total": agg["total"].quantize(Decimal("0.01")),
-        "pagado": agg["pagado"].quantize(Decimal("0.01")),
-        "saldo": agg["saldo"].quantize(Decimal("0.01")),
+        "total": (agg["total"] or Decimal("0.00")).quantize(Decimal("0.01")),
+        "pagado": (agg["pagado"] or Decimal("0.00")).quantize(Decimal("0.01")),
+        "saldo": (agg["saldo"] or Decimal("0.00")).quantize(Decimal("0.01")),
     }
 
-    limite_vista = 500
-    ventas = qs[:limite_vista]
+    # ✅ PAGINACIÓN DJANGO
+    per_page = 25  # pon 10 si quieres ver paginación rápido
+    paginator = Paginator(qs, per_page)
+    page_number = request.GET.get("page")
+    page_obj = paginator.get_page(page_number)
 
     return render(request, "reportes/ventas.html", {
-        "ventas": ventas,
+        "page_obj": page_obj,      # ✅ nuevo
         "resumen": resumen,
-        "limite_vista": limite_vista,
+        "limite_vista": per_page,  # “por página” (si lo quieres mostrar)
 
         # filtros para inputs y export links
         "fi": fi.strftime("%Y-%m-%d") if fi else "",
@@ -379,7 +383,7 @@ def reporte_compras(request):
 
     qs = qs.order_by("-fecha", "-id")
 
-    # Total por compra = suma(detalle.cantidad * detalle.costo_unitario)
+    # ✅ Total por compra = suma(detalle.cantidad * detalle.costo_unitario)
     total_expr = ExpressionWrapper(
         F("detalles__cantidad") * F("detalles__costo_unitario"),
         output_field=DecimalField(max_digits=12, decimal_places=2),
@@ -391,16 +395,19 @@ def reporte_compras(request):
 
     resumen = {
         "cantidad": qs.count(),
-        "total": agg["total"].quantize(Decimal("0.01")),
+        "total": (agg["total"] or Decimal("0.00")).quantize(Decimal("0.01")),
     }
 
-    limite_vista = 500
-    compras = qs[:limite_vista]
+    # ✅ PAGINACIÓN DJANGO
+    per_page = 25  # pon 10 si quieres ver paginación rápido
+    paginator = Paginator(qs, per_page)
+    page_number = request.GET.get("page")
+    page_obj = paginator.get_page(page_number)
 
     return render(request, "reportes/compras.html", {
-        "compras": compras,
+        "page_obj": page_obj,          # ✅ nuevo
         "resumen": resumen,
-        "limite_vista": limite_vista,
+        "limite_vista": per_page,      # “por página” si lo quieres mostrar
 
         "fi": fi.strftime("%Y-%m-%d") if fi else "",
         "ff": ff.strftime("%Y-%m-%d") if ff else "",
@@ -411,7 +418,6 @@ def reporte_compras(request):
         "estado_choices": Compra.Estado.choices,
         "estado_pago_choices": Compra.EstadoPago.choices,
     })
-
 
 @login_required
 def reporte_compras_pdf(request):
@@ -720,7 +726,7 @@ def reporte_existencias(request):
     tipo = (request.GET.get("tipo", "") or "").strip()      # MATERIAL / PRODUCTO / ""
     q = (request.GET.get("q", "") or "").strip()
 
-    items = (
+    qs = (
         ItemInventario.objects
         .select_related(
             "almacen",
@@ -733,34 +739,36 @@ def reporte_existencias(request):
     )
 
     if tipo:
-        items = items.filter(tipo=tipo)
+        qs = qs.filter(tipo=tipo)
 
     if q:
-        items = items.filter(
+        qs = qs.filter(
             Q(material__nombre__icontains=q) |
             Q(variante_producto__sku__icontains=q) |
             Q(variante_producto__producto__nombre__icontains=q) |
             Q(variante_producto__nombre__icontains=q)
         )
 
-    limite_vista = 500
-    lista = items[:limite_vista]
-
-    # Resumen simple
+    # ✅ Resumen (sobre TODO el queryset filtrado)
     resumen = {
-        "cantidad": items.count(),
-        "total_stock": items.aggregate(s=Coalesce(Sum("stock"), Decimal("0.00")))["s"].quantize(Decimal("0.01")),
+        "cantidad": qs.count(),
+        "total_stock": (qs.aggregate(s=Coalesce(Sum("stock"), Decimal("0.00")))["s"] or Decimal("0.00")).quantize(Decimal("0.01")),
     }
 
+    # ✅ PAGINACIÓN DJANGO
+    per_page = 25  # prueba 10 si quieres ver paginación rápido
+    paginator = Paginator(qs, per_page)
+    page_number = request.GET.get("page")
+    page_obj = paginator.get_page(page_number)
+
     return render(request, "reportes/existencias.html", {
-        "items": lista,
+        "page_obj": page_obj,          # ✅ nuevo
         "tipo": tipo,
         "q": q,
-        "limite_vista": limite_vista,
+        "limite_vista": per_page,      # si lo usas en el template como “por página”
         "resumen": resumen,
         "tipo_choices": ItemInventario.TipoItem.choices,
     })
-
 
 @login_required
 def reporte_existencias_pdf(request):
@@ -991,14 +999,26 @@ def reporte_movimientos_inventario(request):
             Q(nota__icontains=q)
         )
 
-    limite_vista = 500
-    movimientos = qs[:limite_vista]
-
-    # Resumen rápido (cantidad + totales por tipo)
+    # ✅ Resumen rápido (cantidad + totales por tipo) - sobre el queryset filtrado COMPLETO
     agg = qs.aggregate(
-        entradas=Coalesce(Sum(Case(When(tipo="ENTRADA", then="cantidad"), default=Value(0), output_field=DecimalField())), Decimal("0.00")),
-        salidas=Coalesce(Sum(Case(When(tipo="SALIDA", then="cantidad"), default=Value(0), output_field=DecimalField())), Decimal("0.00")),
-        ajustes=Coalesce(Sum(Case(When(tipo="AJUSTE", then="cantidad"), default=Value(0), output_field=DecimalField())), Decimal("0.00")),
+        entradas=Coalesce(
+            Sum(Case(When(tipo="ENTRADA", then="cantidad"),
+                     default=Value(0),
+                     output_field=DecimalField())),
+            Decimal("0.00")
+        ),
+        salidas=Coalesce(
+            Sum(Case(When(tipo="SALIDA", then="cantidad"),
+                     default=Value(0),
+                     output_field=DecimalField())),
+            Decimal("0.00")
+        ),
+        ajustes=Coalesce(
+            Sum(Case(When(tipo="AJUSTE", then="cantidad"),
+                     default=Value(0),
+                     output_field=DecimalField())),
+            Decimal("0.00")
+        ),
     )
 
     resumen = {
@@ -1008,13 +1028,26 @@ def reporte_movimientos_inventario(request):
         "ajustes": agg["ajustes"].quantize(Decimal("0.01")),
     }
 
+    # ✅ PAGINACIÓN DJANGO (aquí va el cambio grande)
+    per_page = 25  # <-- puedes subir a 100 si quieres
+    paginator = Paginator(qs, per_page)
+
+    page_number = request.GET.get("page")  # ?page=2
+    page_obj = paginator.get_page(page_number)
+
     return render(request, "reportes/movimientos_inventario.html", {
-        "movimientos": movimientos,
-        "limite_vista": limite_vista,
+        # ✅ ahora mandamos page_obj
+        "page_obj": page_obj,
+
+        # para que el template muestre "Vista previa (últimas X)" si quieres
+        "limite_vista": per_page,
+
+        # filtros para mantener valores y que exporte con los mismos
         "tipo": tipo,
         "q": q,
         "fi": fi_date.strftime("%Y-%m-%d"),
         "ff": ff_date.strftime("%Y-%m-%d"),
+
         "tipo_choices": MovimientoInventario.TipoMovimiento.choices,
         "resumen": resumen,
     })

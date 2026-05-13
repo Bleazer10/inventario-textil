@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% load widget_tweaks %}
 
 {% block titulo %}Nueva variante{% endblock %}
 
@@ -14,25 +15,166 @@
 {% endblock %}
 
 {% block content %}
-<div class="mb-3">
-  <h2 class="fw-black mb-0">Nueva variante</h2>
-  <div class="text-white-50">Producto: {{ producto.nombre }}</div>
+<div class="d-flex justify-content-between align-items-start flex-wrap gap-2 mb-3">
+  <div>
+    <h2 class="fw-black mb-1">Nueva variante</h2>
+    <div class="text-white-50">
+      Producto: <span class="text-white fw-bold">{{ producto.nombre }}</span>
+    </div>
+  </div>
+
+  <div class="text-white-50 small">
+    <span class="badge text-bg-dark border border-light-subtle me-1">Paso 2</span>
+    Variantes (SKU / talla / modelo)
+  </div>
 </div>
 
 <div class="row justify-content-center">
-  <div class="col-12 col-lg-7">
+  <div class="col-12 col-lg-9 col-xl-8">
+
     <div class="card card-bemore">
-      <div class="card-header text-center">Crear variante</div>
-      <div class="card-body">
-        <form method="post">
+      <div class="card-header d-flex align-items-center justify-content-between">
+        <div class="d-flex align-items-center">
+          <i class="fa-solid fa-layer-group me-2"></i>
+          <span class="fw-bold">Información de la variante</span>
+        </div>
+        <span class="text-white-50 small">Campos obligatorios *</span>
+      </div>
+
+      <div class="card-body p-4">
+        <form method="post" novalidate>
           {% csrf_token %}
-          {{ form.as_p }}
-          <button class="btn btn-bemore w-100 fw-bold" type="submit">
-            <i class="fa-solid fa-floppy-disk me-2"></i> Guardar variante
-          </button>
+
+          {% if form.non_field_errors %}
+            <div class="alert alert-danger">
+              {{ form.non_field_errors }}
+            </div>
+          {% endif %}
+
+          <div class="row g-4">
+
+            <!-- Columna izquierda -->
+            <div class="col-12 col-lg-7">
+
+              <div class="mb-3">
+                <label class="form-label">
+                  <i class="fa-solid fa-barcode me-1 text-orange"></i> SKU *
+                </label>
+                {% render_field form.sku class="form-control" placeholder="Ej: FRA-M-NEG-001" %}
+                {% if form.sku.errors %}
+                  <div class="text-warning small mt-1">{{ form.sku.errors|striptags }}</div>
+                {% endif %}
+                <div class="text-white-50 small mt-1">
+                  Código único para identificar la variante en ventas/inventario.
+                </div>
+              </div>
+
+              <div class="mb-3">
+                <label class="form-label">
+                  <i class="fa-solid fa-tag me-1 text-orange"></i> Nombre de variante *
+                </label>
+                {% render_field form.nombre class="form-control" placeholder="Ej: Talla M / Niño / Dama / Rojo" %}
+                {% if form.nombre.errors %}
+                  <div class="text-warning small mt-1">{{ form.nombre.errors|striptags }}</div>
+                {% endif %}
+                <div class="text-white-50 small mt-1">
+                  Aquí va la talla/modelo/color/género (lo que diferencie a esta variante).
+                </div>
+              </div>
+
+              <div class="mb-0">
+                <label class="form-label">
+                  <i class="fa-solid fa-dollar-sign me-1 text-orange"></i> Precio de venta (opcional)
+                </label>
+                <div class="input-group">
+                  <span class="input-group-text bg-dark text-white border-secondary">$</span>
+                  {% render_field form.precio_venta class="form-control" placeholder="(vacío = usa precio por defecto del producto)" %}
+                </div>
+                {% if form.precio_venta.errors %}
+                  <div class="text-warning small mt-1">{{ form.precio_venta.errors|striptags }}</div>
+                {% endif %}
+                <div class="text-white-50 small mt-1">
+                  Si lo dejas vacío, se usa: <strong>${{ producto.precio_venta_defecto }}</strong>
+                </div>
+              </div>
+
+            </div>
+
+            <!-- Columna derecha -->
+            <div class="col-12 col-lg-5">
+              <div class="p-3 rounded-3" style="border:1px solid rgba(255,255,255,.12); background: rgba(255,255,255,.04);">
+                <div class="fw-bold mb-2">
+                  <i class="fa-solid fa-coins me-2 text-orange"></i> Costo de producción
+                </div>
+
+                <div class="mb-3">
+                  <label class="form-label">
+                    <i class="fa-solid fa-gear me-1 text-orange"></i> Modo de costo *
+                  </label>
+                  {% render_field form.modo_costo class="form-control" %}
+                  {% if form.modo_costo.errors %}
+                    <div class="text-warning small mt-1">{{ form.modo_costo.errors|striptags }}</div>
+                  {% endif %}
+                  <div class="text-white-50 small mt-1">
+                    <strong>Fijo</strong>: defines un costo manual.<br>
+                    <strong>Por fórmula</strong>: el costo se calcula con materiales (fórmula).
+                  </div>
+                </div>
+
+                <div class="mb-3">
+                  <label class="form-label">
+                    <i class="fa-solid fa-calculator me-1 text-orange"></i> Costo unitario fijo (si aplica)
+                  </label>
+                  <div class="input-group">
+                    <span class="input-group-text bg-dark text-white border-secondary">$</span>
+                    {% render_field form.costo_unitario_fijo class="form-control" placeholder="0.00" %}
+                  </div>
+                  {% if form.costo_unitario_fijo.errors %}
+                    <div class="text-warning small mt-1">{{ form.costo_unitario_fijo.errors|striptags }}</div>
+                  {% endif %}
+                  <div class="text-white-50 small mt-1">
+                    Solo se usa si el modo de costo es <strong>Fijo</strong>.
+                  </div>
+                </div>
+
+                <hr class="border-light opacity-25 my-3">
+
+                <div class="form-check">
+                  {% render_field form.activa class="form-check-input" %}
+                  <label class="form-check-label">
+                    Variante activa
+                  </label>
+                  <div class="text-white-50 small">
+                    Si la desactivas, no aparecerá en “Nueva venta”.
+                  </div>
+                  {% if form.activa.errors %}
+                    <div class="text-warning small mt-1">{{ form.activa.errors|striptags }}</div>
+                  {% endif %}
+                </div>
+              </div>
+            </div>
+
+          </div>
+
+          <hr class="border-light opacity-25 my-4">
+
+          <div class="d-flex gap-2">
+            <button class="btn btn-bemore fw-bold flex-fill" type="submit">
+              <i class="fa-solid fa-floppy-disk me-2"></i> Guardar variante
+            </button>
+            <a href="{% url 'detalle_producto' producto.id %}" class="btn btn-outline-light fw-bold flex-fill">
+              <i class="fa-solid fa-times me-2"></i> Cancelar
+            </a>
+          </div>
+
+          <div class="text-white-50 small mt-3">
+            * Luego podrás crear la <strong>Fórmula</strong> si el modo de costo es “Por fórmula”.
+          </div>
+
         </form>
       </div>
     </div>
+
   </div>
 </div>
 {% endblock %}
